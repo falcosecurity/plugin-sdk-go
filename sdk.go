@@ -19,16 +19,16 @@ package sdk
 // Functions that return or update a rc (e.g. plugin_init,
 // plugin_open) should return one of these values.
 const (
-	ScapSuccess         int32 = 0
-	ScapFailure         int32 = 1
-	ScapTimeout         int32 = -1
-	ScapIllegalInput    int32 = 3
-	ScapNotFound        int32 = 4
-	ScapInputTooSmall   int32 = 5
-	ScapEOF             int32 = 6
-	ScapUnexpectedBlock int32 = 7
-	ScapVersionMismatch int32 = 8
-	ScapNotSupported    int32 = 9
+	SSPluginSuccess         int32 = 0
+	SSPluginFailure         int32 = 1
+	SSPluginTimeout         int32 = -1
+	SSPluginIllegalInput    int32 = 3
+	SSPluginNotFound        int32 = 4
+	SSPluginInputTooSmall   int32 = 5
+	SSPluginEOF             int32 = 6
+	SSPluginUnexpectedBlock int32 = 7
+	SSPluginVersionMismatch int32 = 8
+	SSPluginNotSupported    int32 = 9
 )
 
 // One of these values should be returned by plugin_get_type().

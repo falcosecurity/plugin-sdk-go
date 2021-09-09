@@ -159,7 +159,7 @@ func WrapExtractFuncs(plgState unsafe.Pointer, evt unsafe.Pointer, numFields uin
 		}
 	}
 
-	return sdk.ScapSuccess
+	return sdk.SSPluginSuccess
 }
 
 // RegisterAsyncExtractors is a helper function to be used within plugin_register_async_extractor.
@@ -200,7 +200,7 @@ func RegisterAsyncExtractors(
 	go func() {
 		info := (*C.async_extractor_info)(asyncExtractorInfo)
 		for C.wait_bridge(info) {
-			info.rc = C.int32_t(sdk.ScapSuccess)
+			info.rc = C.int32_t(sdk.SSPluginSuccess)
 
 			dataBuf := C.GoBytes(unsafe.Pointer(info.evt.data), C.int(info.evt.datalen))
 
@@ -220,7 +220,7 @@ func RegisterAsyncExtractors(
 						info.field.res_str = nil
 					}
 				} else {
-					info.rc = C.int32_t(sdk.ScapNotSupported)
+					info.rc = C.int32_t(sdk.SSPluginNotSupported)
 				}
 			case sdk.ParamTypeUint64:
 				if u64ExtractorFunc != nil {
@@ -233,14 +233,14 @@ func RegisterAsyncExtractors(
 						info.field.res_u64 = C.uint64_t(u64)
 					}
 				} else {
-					info.rc = C.int32_t(sdk.ScapNotSupported)
+					info.rc = C.int32_t(sdk.SSPluginNotSupported)
 				}
 			default:
-				info.rc = C.int32_t(sdk.ScapNotSupported)
+				info.rc = C.int32_t(sdk.SSPluginNotSupported)
 			}
 		}
 	}()
-	return sdk.ScapSuccess
+	return sdk.SSPluginSuccess
 }
 
 // NextFunc is the function type required by NextBatch().
@@ -259,7 +259,7 @@ type NextFunc func(plgState unsafe.Pointer, openState unsafe.Pointer) (*sdk.Plug
 //
 //        // Populate ret here
 //
-//        return ret, sdk.ScapSuccess
+//        return ret, sdk.SSPluginSuccess
 //    }
 //
 //    //export plugin_next_batch
@@ -270,18 +270,18 @@ type NextFunc func(plgState unsafe.Pointer, openState unsafe.Pointer) (*sdk.Plug
 //        return res
 //    }
 func NextBatch(plgState unsafe.Pointer, openState unsafe.Pointer, nextf NextFunc) ([]*sdk.PluginEvent, int32) {
-	res := sdk.ScapSuccess
+	res := sdk.SSPluginSuccess
 
 	evts := make([]*sdk.PluginEvent, 0)
 
 	for len(evts) < sdk.MaxNextBatchEvents {
 		var evt *sdk.PluginEvent
 		evt, res = nextf(plgState, openState)
-		if res == sdk.ScapSuccess {
+		if res == sdk.SSPluginSuccess {
 			evts = append(evts, evt)
-		} else if res == sdk.ScapEOF {
+		} else if res == sdk.SSPluginEOF {
 			// Return success but stop
-			res = sdk.ScapSuccess
+			res = sdk.SSPluginSuccess
 			break
 		} else {
 			break
@@ -299,7 +299,7 @@ func NextBatch(plgState unsafe.Pointer, openState unsafe.Pointer, nextf NextFunc
 //    //export plugin_next_batch
 //    func plugin_next_batch(plgState unsafe.Pointer, openState unsafe.Pointer, nevts *uint32, retEvts **C.ss_plugin_event) int32 {
 //        evts, res := wrappers.NextBatch(plgState, openState, MyNext)
-//        if res == sdk.ScapSuccess {
+//        if res == sdk.SSPluginSuccess {
 //            *retEvts = (*C.ss_plugin_event)(wrappers.Events(evts))
 //            *nevts = (uint32)(len(evts))
 //        }
