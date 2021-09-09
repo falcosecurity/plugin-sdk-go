@@ -73,7 +73,7 @@ import "C"
 import (
 	"unsafe"
 
-	"github.com/mstemm/plugin-sdk-go"
+	"github.com/falcosecurity/plugin-sdk-go"
 )
 
 // PluginExtractStrFunc is used when setting up an async extractor via
