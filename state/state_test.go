@@ -16,43 +16,53 @@ limitations under the License.
 
 package state_test
 
-func ExampleNewStateContainer() {
+import (
+	"unsafe"
+
+	"github.com/falcosecurity/plugin-sdk-go/state"
+)
+
+var plgState unsafe.Pointer
+
+func ExampleNewStateContainer() (unsafe.Pointer) {
 
 	type pluginState struct {
 		// State for a created plugin goes here
 	}
 
 	// Inside plugin_init(config *C.char, rc *int32) unsafe.Pointer) {
-	sobj := NewStateContainer()
+	sobj := state.NewStateContainer()
 	pCtx := &pluginState{}
 	state.SetContext(sobj, unsafe.Pointer(pCtx))
 	return sobj
 	// }
 }
 
-func ExampleSetContext() {
+func ExampleSetContext() (unsafe.Pointer) {
 
 	type pluginState struct {
 		// State for a created plugin goes here
 	}
 
 	// Inside plugin_init(config *C.char, rc *int32) unsafe.Pointer) {
-	sobj := NewStateContainer()
+	sobj := state.NewStateContainer()
 	pCtx := &pluginState{}
 	state.SetContext(sobj, unsafe.Pointer(pCtx))
 	return sobj
 	// }
 }
 
-func ExampleContext() {
+func ExampleContext() (string) {
 
 	type pluginState struct {
 		// State for a created plugin goes here
+		lastError       string
 	}
 
 	// Inside plugin_get_last_error(plgState unsafe.Pointer) *C.char {
 	pCtx := (*pluginState)(state.Context(plgState))
 	// Can now access pCtx as a pluginState struct
+	return pCtx.lastError
 	// }
 }
 
