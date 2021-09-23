@@ -141,20 +141,17 @@ func WrapExtractFuncs(plgState unsafe.Pointer, evt unsafe.Pointer, numFields uin
 		switch uint32(flds[i].ftype) {
 		case sdk.ParamTypeCharBuf:
 			present, str := strExtractorFunc(plgState, uint64(event.evtnum), dataBuf, uint64(event.ts), fieldStr, argStr)
+			flds[i].field_present = C.bool(present)
 			if present {
-				flds[i].field_present = C.bool(true)
 				flds[i].res_str = C.CString(str)
 			} else {
-				flds[i].field_present = C.bool(false)
 				flds[i].res_str = nil
 			}
 		case sdk.ParamTypeUint64:
 			present, u64 := u64ExtractorFunc(plgState, uint64(event.evtnum), dataBuf, uint64(event.ts), fieldStr, argStr)
+			flds[i].field_present = C.bool(present)
 			if present {
-				flds[i].field_present = C.bool(true)
 				flds[i].res_u64 = C.uint64_t(u64)
-			} else {
-				flds[i].field_present = C.bool(false)
 			}
 		}
 	}
@@ -212,11 +209,10 @@ func RegisterAsyncExtractors(
 				if strExtractorFunc != nil {
 					present, str := strExtractorFunc(pluginState, uint64(info.evt.evtnum), dataBuf, uint64(info.evt.ts), fieldStr, argStr)
 
+					info.field.field_present = C.bool(present)
 					if present {
-						info.field.field_present = C.bool(true)
 						info.field.res_str = C.CString(str)
 					} else {
-						info.field.field_present = C.bool(false)
 						info.field.res_str = nil
 					}
 				} else {
@@ -226,10 +222,8 @@ func RegisterAsyncExtractors(
 				if u64ExtractorFunc != nil {
 					present, u64 := u64ExtractorFunc(pluginState, uint64(info.evt.evtnum), dataBuf, uint64(info.evt.ts), fieldStr, argStr)
 
-					if (!present){
-						info.field.field_present = C.bool(true)
-					} else {
-						info.field.field_present = C.bool(false)
+					info.field.field_present = C.bool(present)
+					if present {
 						info.field.res_u64 = C.uint64_t(u64)
 					}
 				} else {
