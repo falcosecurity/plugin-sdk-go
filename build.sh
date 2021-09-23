@@ -1,1 +1,3 @@
+#!/bin/sh
+
 go test ./...
