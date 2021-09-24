@@ -283,6 +283,15 @@ func NextBatch(plgState unsafe.Pointer, openState unsafe.Pointer, nextf NextFunc
 			// Return success but stop
 			res = sdk.SSPluginSuccess
 			break
+		} else if res == sdk.SSPluginTimeout {
+			// Return success if there are any events
+			// queued up, otherwise pass the timeout
+			// along.
+			if len(evts) > 0 {
+				res = sdk.SSPluginSuccess
+			}
+
+			break
 		} else {
 			break
 		}
