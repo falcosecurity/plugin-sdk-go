@@ -100,6 +100,10 @@ const (
 // types. It is used by the wrapper functions in the wrappers
 // sub-package to simplify the implementation of functions like
 // plugin_next/plugin_next_batch.
+//
+// The Evtnum field is assigned by the plugin framework. Therefore,
+// it's not required to fill in an Evtnum when returning events in
+// plugin_next.
 type PluginEvent struct {
 	Evtnum         uint64
 	Data           []byte
