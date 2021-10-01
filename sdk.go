@@ -16,6 +16,31 @@ limitations under the License.
 
 package sdk
 
+/*
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdbool.h>
+
+typedef struct ss_plugin_event
+{
+	uint64_t evtnum;
+	uint8_t *data;
+	uint32_t datalen;
+	uint64_t ts;
+} ss_plugin_event;
+
+
+*/
+import "C"
+import (
+	"fmt"
+	"io"
+	"math"
+	"unsafe"
+)
+
 // Functions that return or update a rc (e.g. plugin_init,
 // plugin_open) should return one of these values.
 const (
@@ -104,19 +129,126 @@ const (
 // The Evtnum field is assigned by the plugin framework. Therefore,
 // it's not required to fill in an Evtnum when returning events in
 // plugin_next.
-type PluginEvent struct {
-	Evtnum         uint64
-	Data           []byte
-	Timestamp      uint64
-}
 
 // FieldEntry represents a single field entry that an extractor plugin can expose.
 // Should be used when implementing plugin_get_fields().
 type FieldEntry struct {
-	Type               string `json:"type"`
-	Name               string `json:"name"`
-	ArgRequired        bool `json:"argRequired"`
-	Display            string `json:"display"`
-	Desc               string `json:"desc"`
-	Properties         string `json:"properties"`
+	Type        string `json:"type"`
+	Name        string `json:"name"`
+	ArgRequired bool   `json:"argRequired"`
+	Display     string `json:"display"`
+	Desc        string `json:"desc"`
+	Properties  string `json:"properties"`
+}
+type PluginEvent interface {
+	Reader() io.ReadSeeker // This reads nothing if nothing has been written here with Writer()
+	Writer() io.Writer     // This erases all the content
+	SetTimestamp(value uint64)
+}
+
+type PluginEvents interface {
+	Get(eventIndex int) PluginEvent
+	Len() int
+	Free()
+	ArrayPtr() unsafe.Pointer // Points to a C-allocated array of ss_plugin_event
+}
+type pluginEvent struct {
+	data        BytesReadWriter
+	dataSize    int64
+	ssPluginEvt unsafe.Pointer
+}
+
+type pluginEvents []*pluginEvent
+
+func newPluginEvent(evtPtr unsafe.Pointer, dataSize int64) (*pluginEvent, error) {
+	evt := (*C.ss_plugin_event)(evtPtr)
+	evt.ts = C.ulong(math.MaxUint64)
+	evt.data = (*C.uchar)(C.malloc(C.size_t(dataSize)))
+	evt.datalen = 0
+	brw, err := NewBytesReadWriter(unsafe.Pointer(evt.data), int64(dataSize))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &pluginEvent{
+		ssPluginEvt: evtPtr,
+		data:        brw,
+		dataSize:    dataSize,
+	}, nil
+}
+
+func NewPluginEvents(size, dataSize int64) (PluginEvents, error) {
+	if size < 0 || size > MaxNextBatchEvents {
+		return nil, fmt.Errorf("invalid size: %d", size)
+	}
+	if dataSize < 0 || dataSize > math.MaxInt {
+		return nil, fmt.Errorf("invalid dataSize: %d", dataSize)
+	}
+
+	ret := (pluginEvents)(make([]*pluginEvent, size))
+	pluginEvtArray := (*C.ss_plugin_event)(C.malloc((C.ulong)(size * C.sizeof_ss_plugin_event)))
+	var err error
+	for i := range ret {
+		// get i-th element of pluginEvtArray
+		evtPtr := unsafe.Pointer(uintptr(unsafe.Pointer(pluginEvtArray)) + uintptr(i*C.sizeof_ss_plugin_event))
+		if ret[i], err = newPluginEvent(evtPtr, dataSize); err != nil {
+			return nil, err
+		}
+	}
+	return ret, nil
+}
+
+func (p *pluginEvent) free() {
+	C.free(unsafe.Pointer((*C.ss_plugin_event)(p.ssPluginEvt).data))
+	p.data = nil
+}
+
+func (p *pluginEvent) Write(data []byte) (n int, err error) {
+	n, err = p.data.Write(data)
+	if err != nil {
+		return
+	}
+	(*C.ss_plugin_event)(p.ssPluginEvt).datalen += C.uint(n)
+	return
+}
+
+func (p *pluginEvent) Writer() io.Writer {
+	p.data.SetSize(p.dataSize)
+	p.data.Seek(0, io.SeekStart)
+	(*C.ss_plugin_event)(p.ssPluginEvt).datalen = 0
+	return p
+}
+
+func (p *pluginEvent) Reader() io.ReadSeeker {
+	p.data.SetSize(int64((*C.ss_plugin_event)(p.ssPluginEvt).datalen))
+	p.data.Seek(0, io.SeekStart)
+	return p.data
+}
+
+func (p *pluginEvent) SetTimestamp(value uint64) {
+	(*C.ss_plugin_event)(p.ssPluginEvt).ts = C.ulong(value)
+}
+
+func (p pluginEvents) ArrayPtr() unsafe.Pointer {
+	l := len(p)
+	if l == 0 {
+		return nil
+	}
+	return p[0].ssPluginEvt
+}
+
+func (p pluginEvents) Free() {
+	for _, pe := range p {
+		pe.free()
+	}
+	C.free( /*(*C.ss_plugin_event)*/ p.ArrayPtr())
+}
+
+func (p pluginEvents) Get(eventIndex int) PluginEvent {
+	return p[eventIndex]
+}
+
+func (p pluginEvents) Len() int {
+	return len(p)
 }

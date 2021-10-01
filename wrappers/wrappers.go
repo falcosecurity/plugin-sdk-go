@@ -21,6 +21,7 @@ package wrappers
 */
 import "C"
 import (
+	"io"
 	"unsafe"
 
 	sdk "github.com/falcosecurity/plugin-sdk-go"
@@ -30,13 +31,13 @@ import (
 // RegisterAsyncExtractors.
 //
 // The return value should be (field present as bool, extracted value)
-type PluginExtractStrFunc func(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, string)
+type PluginExtractStrFunc func(pluginState unsafe.Pointer, evtnum uint64, data io.ReadSeeker, ts uint64, field string, arg string) (bool, string)
 
 // PluginExtractU64Func is used when using RegisterExtractors or
 // RegisterAsyncExtractors.
 //
 // The return value should be (field present as bool, extracted value)
-type PluginExtractU64Func func(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, uint64)
+type PluginExtractU64Func func(pluginState unsafe.Pointer, evtnum uint64, data io.ReadSeeker, ts uint64, field string, arg string) (bool, uint64)
 
 // These functions will be called by the sdk and are set in RegisterExtractors()/RegisterAsyncExtractors
 var extractStrFunc PluginExtractStrFunc
@@ -47,15 +48,19 @@ func wrapExtractFuncs(plgState unsafe.Pointer, evt unsafe.Pointer, numFields uin
 	u64ExtractorFunc PluginExtractU64Func) int32 {
 
 	event := (*C.struct_ss_plugin_event)(evt)
-	dataBuf := C.GoBytes(unsafe.Pointer(event.data), C.int(event.datalen))
 
 	// https://github.com/golang/go/wiki/cgo#turning-c-arrays-into-go-slices
 	flds := (*[1 << 28]C.struct_ss_plugin_extract_field)(unsafe.Pointer(fields))[:numFields:numFields]
+	dataBuf, err := sdk.NewBytesReadWriter(unsafe.Pointer(event.data), int64(event.datalen))
+	if err != nil {
+		// todo(jasondellaluce,leogr): error is lost here, what to do?
+		return sdk.SSPluginFailure
+	}
 
 	var i uint32
 	for i = 0; i < numFields; i++ {
-		fieldStr := C.GoString((*C.char)(flds[i].field))
-		argStr := C.GoString((*C.char)(flds[i].arg))
+		fieldStr := sdk.GoString(unsafe.Pointer(flds[i].field))
+		argStr := sdk.GoString(unsafe.Pointer(flds[i].arg))
 
 		switch uint32(flds[i].ftype) {
 		case sdk.ParamTypeCharBuf:
@@ -167,10 +172,14 @@ func RegisterAsyncExtractors(
 		for C.async_extractor_wait(info) {
 			info.rc = C.int32_t(sdk.SSPluginSuccess)
 
-			dataBuf := C.GoBytes(unsafe.Pointer(info.evt.data), C.int(info.evt.datalen))
-
-			fieldStr := C.GoString((*C.char)(info.field.field))
-			argStr := C.GoString((*C.char)(info.field.arg))
+			fieldStr := sdk.GoString(unsafe.Pointer(info.field.field))
+			argStr := sdk.GoString(unsafe.Pointer(info.field.arg))
+			dataBuf, err := sdk.NewBytesReadWriter(unsafe.Pointer(info.evt.data), int64(info.evt.datalen))
+			if err != nil {
+				// todo(jasondellaluce,leogr): error is lost here, what to do?
+				info.rc = C.int32_t(sdk.SSPluginFailure)
+				continue
+			}
 
 			switch uint32(info.field.ftype) {
 			case sdk.ParamTypeCharBuf:
