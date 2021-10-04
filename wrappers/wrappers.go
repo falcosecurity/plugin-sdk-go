@@ -23,7 +23,7 @@ import "C"
 import (
 	"unsafe"
 
-	"github.com/falcosecurity/plugin-sdk-go"
+	sdk "github.com/falcosecurity/plugin-sdk-go"
 )
 
 // PluginExtractStrFunc is used when using RegisterExtractors or
@@ -220,93 +220,4 @@ func plugin_extract_fields_sync(plgState unsafe.Pointer, evt *C.ss_plugin_event,
 	}
 
 	return wrapExtractFuncs(plgState, unsafe.Pointer(evt), numFields, unsafe.Pointer(fields), extractStrFunc, extractU64Func)
-}
-
-// NextFunc is the function type required by NextBatch().
-type NextFunc func(plgState unsafe.Pointer, openState unsafe.Pointer) (*sdk.PluginEvent, int32)
-
-// NextBatch is an helper function to be used within
-// plugin_next_batch. It takes a Next() function as argument that
-// returns a single sdk.PluginEvent struct pointer and calls that
-// function as needed to populate a dynamically allocated array of
-// ss_plugin_event structs with dynamically allocated data payloads.
-//
-// Example Usage:
-//
-//    func MyNext(plgState unsafe.Pointer, openState unsafe.Pointer) (*sdk.PluginEvent, int32) {
-//        ret := &sdk.PluginEvent{}
-//
-//        // Populate ret here
-//
-//        return ret, sdk.SSPluginSuccess
-//    }
-//
-//    //export plugin_next_batch
-//    func plugin_next_batch(plgState unsafe.Pointer, openState unsafe.Pointer, nevts *uint32, retEvts **C.ss_plugin_event) int32 {
-//        evts, res := wrappers.NextBatch(plgState, openState, MyNext)
-//        // .. convert sdk.PluginEvent to ss_plugin_event (see wrappers.Events())
-//
-//        return res
-//    }
-func NextBatch(plgState unsafe.Pointer, openState unsafe.Pointer, nextf NextFunc) ([]*sdk.PluginEvent, int32) {
-	res := sdk.SSPluginSuccess
-
-	evts := make([]*sdk.PluginEvent, 0)
-
-	for len(evts) < sdk.MaxNextBatchEvents {
-		var evt *sdk.PluginEvent
-		evt, res = nextf(plgState, openState)
-		if res == sdk.SSPluginSuccess {
-			evts = append(evts, evt)
-		} else if res == sdk.SSPluginEOF {
-			// Return success but stop
-			res = sdk.SSPluginSuccess
-			break
-		} else if res == sdk.SSPluginTimeout {
-			// Return success if there are any events
-			// queued up, otherwise pass the timeout
-			// along.
-			if len(evts) > 0 {
-				res = sdk.SSPluginSuccess
-			}
-
-			break
-		} else {
-			break
-		}
-	}
-
-	return evts, res
-}
-
-// Convert the provided slice of PluginEvents into a C array of
-// ss_plugin_event structs, suitable for returning in
-// plugin_next/plugin_next_batch.
-//
-// Example usage:
-//    //export plugin_next_batch
-//    func plugin_next_batch(plgState unsafe.Pointer, openState unsafe.Pointer, nevts *uint32, retEvts **C.ss_plugin_event) int32 {
-//        evts, res := wrappers.NextBatch(plgState, openState, MyNext)
-//        if res == sdk.SSPluginSuccess {
-//            *retEvts = (*C.ss_plugin_event)(wrappers.Events(evts))
-//            *nevts = (uint32)(len(evts))
-//        }
-//    }
-//
-// The return value is an unsafe.Pointer, as the C.ss_plugin_event
-// type is package-specific and can't be easily used outside the
-// package (See https://github.com/golang/go/issues/13467)
-func Events(evts []*sdk.PluginEvent) unsafe.Pointer {
-	ret := (*C.ss_plugin_event)(C.malloc((C.ulong)(len(evts))*C.sizeof_ss_plugin_event))
-
-	// https://github.com/golang/go/wiki/cgo#turning-c-arrays-into-go-slices
-	length := len(evts)
-	cevts := (*[1 << 28]C.ss_plugin_event)(unsafe.Pointer(ret))[:length:length]
-	for i := 0; i < length; i++ {
-		cevts[i].data = (*C.uchar)(C.CBytes(evts[i].Data))
-		cevts[i].datalen = (C.uint)(len(evts[i].Data))
-		cevts[i].ts = (C.uint64_t)(evts[i].Timestamp)
-	}
-
-	return (unsafe.Pointer)(ret)
 }
