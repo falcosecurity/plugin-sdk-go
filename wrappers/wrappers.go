@@ -106,7 +106,7 @@ func wrapExtractFuncs(plgState unsafe.Pointer, evt unsafe.Pointer, numFields uin
 // over an array of ss_plugin_extract_field structs.
 //
 // Here's an example:
-//    func MyExtractStrFunc(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, string) {
+//    func MyExtractStrFunc(pluginState unsafe.Pointer, evtnum uint64, data io.ReadSeeker, ts uint64, field string, arg string) (bool, string) {
 //        switch field {
 //        case "plugin.field1":
 //            return true, "some-value-for-field-from-event"
@@ -117,7 +117,7 @@ func wrapExtractFuncs(plgState unsafe.Pointer, evt unsafe.Pointer, numFields uin
 //        return false, ""
 //    }
 //
-//    func MyExtractU64Func(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, uint64) {
+//    func MyExtractU64Func(pluginState unsafe.Pointer, evtnum uint64, data io.ReadSeeker, ts uint64, field string, arg string) (bool, uint64) {
 //        switch field {
 //        case "plugin.field1":
 //            var someValueForFieldFromEvent uint64 = 282;
@@ -148,11 +148,11 @@ func RegisterExtractors(strExtractorFunc PluginExtractStrFunc, u64ExtractorFunc 
 // plugin should use RegisterExtractors instead.
 //
 // Here's an example:
-//    func MyExtractStrFunc(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, string) {
+//    func MyExtractStrFunc(pluginState unsafe.Pointer, evtnum uint64, data io.ReadSeeker, ts uint64, field string, arg string) (bool, string) {
 //        ...
 //    }
 //
-//    func MyExtractU64Func(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, uint64) {
+//    func MyExtractU64Func(pluginState unsafe.Pointer, evtnum uint64, data io.ReadSeeker, ts uint64, field string, arg string) (bool, uint64) {
 //        ...
 //    }
 //

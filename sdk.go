@@ -121,15 +121,6 @@ const (
 	ParamTypeMax              uint32 = 44 // array size
 )
 
-// PluginEvent can be used to represent a single plugin event using go
-// types. It is used by the wrapper functions in the wrappers
-// sub-package to simplify the implementation of functions like
-// plugin_next/plugin_next_batch.
-//
-// The Evtnum field is assigned by the plugin framework. Therefore,
-// it's not required to fill in an Evtnum when returning events in
-// plugin_next.
-
 // FieldEntry represents a single field entry that an extractor plugin can expose.
 // Should be used when implementing plugin_get_fields().
 type FieldEntry struct {
@@ -140,17 +131,127 @@ type FieldEntry struct {
 	Desc        string `json:"desc"`
 	Properties  string `json:"properties"`
 }
+
+// PluginEvent can be used to represent events produced by a plugin.
+// This interface is meant to be used in the next/next_batch and
+// the extraction flows.
+//
+// Data inside an event can only be accessed
+// either in read-only or write-only mode through the Reader and
+// Writer methods respectively.
+//
+// Instances of this interface should be retrieved through the Get
+// method of sdk.PluginEvents.
 type PluginEvent interface {
-	Reader() io.ReadSeeker // This reads nothing if nothing has been written here with Writer()
-	Writer() io.Writer     // This erases all the content
-	SetTimestamp(value uint64)
+	// Writer returns an instance of io.Writer that points to the
+	// event data. This is the only way to write inside the event data.
+	//
+	// Each invocation of Writer clears the event data and sets its
+	// size to zero. As such, consequent invocations of Writer can
+	// potentially return two distinct instances of io.Writer, and
+	// that any data written inside the event will be erased.
+	Writer() io.Writer
+	//
+	// Reader returns an instance of io.ReadSeeker that points to the
+	// event data. This is the only way to read from the event data.
+	// If no data has yet be written through the Writer method, the
+	// reader will read no data. Only data written through the Writer
+	// method will be readable.
+	//
+	// This method returns an instance of io.ReadSeeker to leave the door
+	// open for seek-related optimizations, which could be useful in the
+	// field extraction use case.
+	Reader() io.ReadSeeker
+	//
+	// SetTimestamp sets the timestamp of the event. This is supposed
+	// to be invoked in the next/next_batch flow.
+	SetTimestamp(value uint64) // todo(jasondellaluce, leogr): set default value to current timestamp?
 }
 
+// PluginEvents represent a list of sdk.PluginEvent to be used inside
+// plugins. This interface hides the complexities related to the internal
+// representation of C strutures and to the optimized memory management.
+// Internally, this wraps an array of ss_plugin_event C structs that are
+// compliant with the symbols and APIs of the plugin framework.
+// The underlying C array can be accessed through the ArrayPtr method as
+// an unsafe.Pointer. Manually writing inside the C array might break the
+// internal logic of sdk.PluginEvents thus leading to non-deterministic
+// behavior.
+//
+// This is intended to be used as a slab memory allocator. PluginEvents
+// are supposed to be stored inside the plugin instance state to avoid
+// useless reallocations, and should be used to create plugin events and
+// write data in them. Unlike slices, the events contained in the list
+// can only be accessed by using the Get and Len methods to enforce safe
+// memory accesses. Ideally, the list is meant to be large enough to contain
+// the maximum number of events that the plugin is capable of producing with
+// plugin_next_batch. The plugin_next symbol should only work on the first
+// event of the list instead.
+//
+// The underlying C memory managed by this interface is out of the scope of
+// garbage collection, and memory must be manually deallocated by invoking
+// the Free method. Using instances of PluginEvents after invoking its Free()
+// method might lead to non-deterministic behavior.
+//
+// Here is an example of usage:
+//	func plugin_open(pState unsafe.Pointer, params *C.char, rc *int32) unsafe.Pointer {
+//		...
+//		// Create instance of sdk.PluginEvents
+//		pluginEvents, err := sdk.NewPluginEvents(maxNextBatchEvents, int64(sdk.MaxEvtSize))
+//		if err != nil {
+//			*rc = sdk.SSPluginFailure
+//			return nil
+//		}
+//
+//		// Store pluginEvents inside the plugin instance state
+//		is := &instanceState{
+//			...
+//			pluginEvents:       pluginEvents,
+//		}
+//		handle := state.NewStateContainer()
+//		state.SetContext(handle, unsafe.Pointer(is))
+//		*rc = sdk.SSPluginSuccess
+//		return handle
+//	}
+//
+//	func plugin_next(pState unsafe.Pointer, iState unsafe.Pointer, retEvt **C.ss_plugin_event) int32 {
+//		// Grab an instance of the event through sdk.PluginEvents
+//		is := (*instanceState)(state.Context(iState))
+//		event := is.pluginEvents.Get(0)
+//
+//		// Write the event data and set the timestamp
+//		eventData := "Sample event data... Hello World!"
+//		eventWriter := event.Writer()
+//		eventWriter.Write([]byte(eventData))
+//		event.SetTimestamp(uint64(time.Now().Unix()) * 1000000000)
+//
+//		// Set the result pointer to the internal event array buffer
+//		*retEvt = (*C.ss_plugin_event)(is.pluginEvents.ArrayPtr())
+//		return sdk.SSPluginSuccess
+//	}
+//
 type PluginEvents interface {
+	// Get returns an instance of sdk.PluginEvent at the eventIndex
+	// position inside the list.
 	Get(eventIndex int) PluginEvent
+	//
+	// Len returns the size of the list, namely the number of events
+	// it contains. Using Len coupled with Get allows iterating over
+	// all the events of the list.
 	Len() int
+	//
+	// Free takes care of de-allocating all the memory managed by
+	// instances of PluginEvents. Note that using the same instance
+	// after invoking its Free method might lead to non-determinitic
+	// behavior.
 	Free()
-	ArrayPtr() unsafe.Pointer // Points to a C-allocated array of ss_plugin_event
+	//
+	// ArrayPtr return an unsafe pointer to the underlying C array of
+	// ss_plugin_event. The returned pointer should only be used for
+	// read tasks or for being passed to the plugin framework.
+	// Writing in the memory pointed by this pointer is unsafe and might
+	// lead to non-deterministic behavior.
+	ArrayPtr() unsafe.Pointer
 }
 type pluginEvent struct {
 	data        BytesReadWriter
@@ -160,24 +261,10 @@ type pluginEvent struct {
 
 type pluginEvents []*pluginEvent
 
-func newPluginEvent(evtPtr unsafe.Pointer, dataSize int64) (*pluginEvent, error) {
-	evt := (*C.ss_plugin_event)(evtPtr)
-	evt.ts = C.ulong(math.MaxUint64)
-	evt.data = (*C.uchar)(C.malloc(C.size_t(dataSize)))
-	evt.datalen = 0
-	brw, err := NewBytesReadWriter(unsafe.Pointer(evt.data), int64(dataSize))
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &pluginEvent{
-		ssPluginEvt: evtPtr,
-		data:        brw,
-		dataSize:    dataSize,
-	}, nil
-}
-
+// NewPluginEvents creates a new instance of sdk.PluginEvents.
+// The size argument indicates the length of the list, which is the amount
+// of events contained. Then dataSize argument indicates the maximum data
+// size of each event.
 func NewPluginEvents(size, dataSize int64) (PluginEvents, error) {
 	if size < 0 || size > MaxNextBatchEvents {
 		return nil, fmt.Errorf("invalid size: %d", size)
@@ -199,9 +286,59 @@ func NewPluginEvents(size, dataSize int64) (PluginEvents, error) {
 	return ret, nil
 }
 
-func (p *pluginEvent) free() {
-	C.free(unsafe.Pointer((*C.ss_plugin_event)(p.ssPluginEvt).data))
-	p.data = nil
+func (p pluginEvents) Get(eventIndex int) PluginEvent {
+	return p[eventIndex]
+}
+
+func (p pluginEvents) Len() int {
+	return len(p)
+}
+
+func (p pluginEvents) Free() {
+	for _, pe := range p {
+		pe.free()
+	}
+	C.free( /*(*C.ss_plugin_event)*/ p.ArrayPtr())
+}
+
+func (p pluginEvents) ArrayPtr() unsafe.Pointer {
+	l := len(p)
+	if l == 0 {
+		return nil
+	}
+	return p[0].ssPluginEvt
+}
+
+func newPluginEvent(evtPtr unsafe.Pointer, dataSize int64) (*pluginEvent, error) {
+	evt := (*C.ss_plugin_event)(evtPtr)
+	evt.ts = C.ulong(math.MaxUint64)
+	// todo(jasondellaluce, leogr): optimize this to leverage memory locality.
+	evt.data = (*C.uchar)(C.malloc(C.size_t(dataSize)))
+	evt.datalen = 0
+	brw, err := NewBytesReadWriter(unsafe.Pointer(evt.data), int64(dataSize))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &pluginEvent{
+		ssPluginEvt: evtPtr,
+		data:        brw,
+		dataSize:    dataSize,
+	}, nil
+}
+
+func (p *pluginEvent) Reader() io.ReadSeeker {
+	p.data.SetSize(int64((*C.ss_plugin_event)(p.ssPluginEvt).datalen))
+	p.data.Seek(0, io.SeekStart)
+	return p.data
+}
+
+func (p *pluginEvent) Writer() io.Writer {
+	p.data.SetSize(p.dataSize)
+	p.data.Seek(0, io.SeekStart)
+	(*C.ss_plugin_event)(p.ssPluginEvt).datalen = 0
+	return p
 }
 
 func (p *pluginEvent) Write(data []byte) (n int, err error) {
@@ -213,42 +350,11 @@ func (p *pluginEvent) Write(data []byte) (n int, err error) {
 	return
 }
 
-func (p *pluginEvent) Writer() io.Writer {
-	p.data.SetSize(p.dataSize)
-	p.data.Seek(0, io.SeekStart)
-	(*C.ss_plugin_event)(p.ssPluginEvt).datalen = 0
-	return p
-}
-
-func (p *pluginEvent) Reader() io.ReadSeeker {
-	p.data.SetSize(int64((*C.ss_plugin_event)(p.ssPluginEvt).datalen))
-	p.data.Seek(0, io.SeekStart)
-	return p.data
-}
-
 func (p *pluginEvent) SetTimestamp(value uint64) {
 	(*C.ss_plugin_event)(p.ssPluginEvt).ts = C.ulong(value)
 }
 
-func (p pluginEvents) ArrayPtr() unsafe.Pointer {
-	l := len(p)
-	if l == 0 {
-		return nil
-	}
-	return p[0].ssPluginEvt
-}
-
-func (p pluginEvents) Free() {
-	for _, pe := range p {
-		pe.free()
-	}
-	C.free( /*(*C.ss_plugin_event)*/ p.ArrayPtr())
-}
-
-func (p pluginEvents) Get(eventIndex int) PluginEvent {
-	return p[eventIndex]
-}
-
-func (p pluginEvents) Len() int {
-	return len(p)
+func (p *pluginEvent) free() {
+	C.free(unsafe.Pointer((*C.ss_plugin_event)(p.ssPluginEvt).data))
+	p.data = nil
 }

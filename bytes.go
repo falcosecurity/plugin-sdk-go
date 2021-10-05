@@ -30,9 +30,9 @@ import (
 )
 
 const (
-	offsetErrorFmt = "INVALID OFFSET VALUE %d"
-	sizeErrorFmt   = "INVALID SIZE VALUE %d"
-	whenceErrorFmt = "INVALID WHENCE VALUE %d"
+	offsetErrorFmt = "invalid offset value %d"
+	sizeErrorFmt   = "invalid size value %d"
+	whenceErrorFmt = "invalid whence value %d"
 )
 
 // BytesReadWriter is an opaque wrapper for fixed-size memory buffers, that can safely be
