@@ -266,7 +266,7 @@ type pluginEvents []*pluginEvent
 // of events contained. Then dataSize argument indicates the maximum data
 // size of each event.
 func NewPluginEvents(size, dataSize int64) (PluginEvents, error) {
-	if size < 0 || size > MaxNextBatchEvents {
+	if size < 1 || size > MaxNextBatchEvents {
 		return nil, fmt.Errorf("invalid size: %d", size)
 	}
 	if dataSize < 0 || dataSize > math.MaxInt {
@@ -302,10 +302,6 @@ func (p pluginEvents) Free() {
 }
 
 func (p pluginEvents) ArrayPtr() unsafe.Pointer {
-	l := len(p)
-	if l == 0 {
-		return nil
-	}
 	return p[0].ssPluginEvt
 }
 
