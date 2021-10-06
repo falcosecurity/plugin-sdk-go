@@ -38,6 +38,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"runtime"
 	"unsafe"
 )
 
@@ -188,11 +189,6 @@ type PluginEvent interface {
 // plugin_next_batch. The plugin_next symbol should only work on the first
 // event of the list instead.
 //
-// The underlying C memory managed by this interface is out of the scope of
-// garbage collection, and memory must be manually deallocated by invoking
-// the Free method. Using instances of PluginEvents after invoking its Free()
-// method might lead to non-deterministic behavior.
-//
 // Here is an example of usage:
 //	func plugin_open(pState unsafe.Pointer, params *C.char, rc *int32) unsafe.Pointer {
 //		...
@@ -240,12 +236,6 @@ type PluginEvents interface {
 	// all the events of the list.
 	Len() int
 	//
-	// Free takes care of de-allocating all the memory managed by
-	// instances of PluginEvents. Note that using the same instance
-	// after invoking its Free method might lead to non-determinitic
-	// behavior.
-	Free()
-	//
 	// ArrayPtr return an unsafe pointer to the underlying C array of
 	// ss_plugin_event. The returned pointer should only be used for
 	// read tasks or for being passed to the plugin framework.
@@ -283,6 +273,8 @@ func NewPluginEvents(size, dataSize int64) (PluginEvents, error) {
 			return nil, err
 		}
 	}
+
+	runtime.SetFinalizer(&ret, (*pluginEvents).free)
 	return ret, nil
 }
 
@@ -294,7 +286,7 @@ func (p pluginEvents) Len() int {
 	return len(p)
 }
 
-func (p pluginEvents) Free() {
+func (p pluginEvents) free() {
 	for _, pe := range p {
 		pe.free()
 	}
