@@ -269,7 +269,7 @@ func NewPluginEvents(size, dataSize int64) (PluginEvents, error) {
 	if size < 1 || size > MaxNextBatchEvents {
 		return nil, fmt.Errorf("invalid size: %d", size)
 	}
-	if dataSize < 0 || dataSize > math.MaxInt {
+	if dataSize < 0 || dataSize > int64(MaxEvtSize) {
 		return nil, fmt.Errorf("invalid dataSize: %d", dataSize)
 	}
 
