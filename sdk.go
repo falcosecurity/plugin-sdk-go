@@ -303,7 +303,7 @@ func newPluginEvent(evtPtr unsafe.Pointer, dataSize int64) (*pluginEvent, error)
 	// todo(jasondellaluce, leogr): optimize this to leverage memory locality.
 	evt.data = (*C.uchar)(C.malloc(C.size_t(dataSize)))
 	evt.datalen = 0
-	brw, err := NewBytesReadWriter(unsafe.Pointer(evt.data), int64(dataSize))
+	brw, err := NewBytesReadWriter(unsafe.Pointer(evt.data), int64(dataSize), int64(dataSize))
 
 	if err != nil {
 		return nil, err
@@ -317,13 +317,13 @@ func newPluginEvent(evtPtr unsafe.Pointer, dataSize int64) (*pluginEvent, error)
 }
 
 func (p *pluginEvent) Reader() io.ReadSeeker {
-	p.data.SetSize(int64((*C.ss_plugin_event)(p.ssPluginEvt).datalen))
+	p.data.SetLen(int64((*C.ss_plugin_event)(p.ssPluginEvt).datalen))
 	p.data.Seek(0, io.SeekStart)
 	return p.data
 }
 
 func (p *pluginEvent) Writer() io.Writer {
-	p.data.SetSize(p.dataSize)
+	p.data.SetLen(p.dataSize)
 	p.data.Seek(0, io.SeekStart)
 	(*C.ss_plugin_event)(p.ssPluginEvt).datalen = 0
 	return p

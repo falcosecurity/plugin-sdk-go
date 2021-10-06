@@ -51,7 +51,7 @@ func wrapExtractFuncs(plgState unsafe.Pointer, evt unsafe.Pointer, numFields uin
 
 	// https://github.com/golang/go/wiki/cgo#turning-c-arrays-into-go-slices
 	flds := (*[1 << 28]C.struct_ss_plugin_extract_field)(unsafe.Pointer(fields))[:numFields:numFields]
-	dataBuf, err := sdk.NewBytesReadWriter(unsafe.Pointer(event.data), int64(event.datalen))
+	dataBuf, err := sdk.NewBytesReadWriter(unsafe.Pointer(event.data), int64(event.datalen), int64(event.datalen))
 	if err != nil {
 		// todo(jasondellaluce,leogr): error is lost here, what to do?
 		return sdk.SSPluginFailure
@@ -174,7 +174,7 @@ func RegisterAsyncExtractors(
 
 			fieldStr := sdk.GoString(unsafe.Pointer(info.field.field))
 			argStr := sdk.GoString(unsafe.Pointer(info.field.arg))
-			dataBuf, err := sdk.NewBytesReadWriter(unsafe.Pointer(info.evt.data), int64(info.evt.datalen))
+			dataBuf, err := sdk.NewBytesReadWriter(unsafe.Pointer(info.evt.data), int64(info.evt.datalen), int64(info.evt.datalen))
 			if err != nil {
 				// todo(jasondellaluce,leogr): error is lost here, what to do?
 				info.rc = C.int32_t(sdk.SSPluginFailure)

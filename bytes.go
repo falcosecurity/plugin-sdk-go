@@ -30,59 +30,77 @@ import (
 )
 
 const (
-	offsetErrorFmt = "invalid offset value %d"
-	sizeErrorFmt   = "invalid size value %d"
-	whenceErrorFmt = "invalid whence value %d"
+	offsetErrorFmt   = "invalid offset value %d"
+	lengthErrorFmt   = "invalid length value %d"
+	capacityErrorFmt = "invalid capacity value %d"
+	whenceErrorFmt   = "invalid whence value %d"
+	bufferErrorFmt   = "invalid buffer value"
 )
 
 // BytesReadWriter is an opaque wrapper for fixed-size memory buffers, that can safely be
-// used in the plugin framework ina Go-friendly way. The purpose is to provide means
-// for safe memory access through the read/write interface primitives, regardless of how
-// how the buffer is physically allocated under the hood. For instance, this can be used
-// to wrap a C-allocated buffed, to hide both the type conversion magic and avoid illegal
-// memory operations. The io.ReadWriteSeeker interface is leveraged to implement the safe
-// random memory access semantic. Note, read-only or rite-only modes to the memory buffer
-// can easily be accomplished by casting this to either a io.Reader or io.Writer.
+// used in the plugin framework in a Go-friendly way. The purpose is to allow safe memory
+// access through the read/write interface primitives, regardless of how the buffer is
+// physically allocated under the hood. For instance, this can be used to wrap C-allocated
+// buffers to hide both the type conversion magic and prevent illegal memory operations.
+//
+// The io.ReadWriteSeeker interface is leveraged to implement the safe random memory
+// access semantic. Note, read-only or write-only access to the memory buffer
+// can easily be accomplished by casting instances of this interface to either a io.Reader
+// or a io.Writer.
 type BytesReadWriter interface {
 	io.ReadWriteSeeker
 	//
-	// Returns an unsafe.Pointer that points to the underlying memory buffer.
-	Buffer() unsafe.Pointer
+	// BufferPtr returns an unsafe.Pointer that points to the underlying memory buffer.
+	BufferPtr() unsafe.Pointer
 	//
-	// Size returns the physical size of the underlying memory buffer.
-	Size() int64
+	// Len returns the total number of accessible bytes for reading and writing.
+	Len() int64
 	//
-	SetSize(size int64)
+	// SetLen sets the total number of accessible bytes for reading and writing.
+	// The new length value should not be larger than the underlying memory buffer capacity.
+	// If a greater value is given, the length is set to be equal to the capacity.
+	// If a value less than zero is given, the length is set to be zero.
+	SetLen(len int64)
 	//
-	// Offser returns the current cursor position relatively to the underlying buffer.
+	// Offset returns the current cursor position relatively to the underlying buffer.
 	// The cursor position represents the index of the next byte in the buffer that will
 	// be available for read\write operations. This value is altered through the usage of
-	// Seek, Read, and Write. By definition, we have that 0 <= Offset() <= Size().
+	// Seek, Read, and Write. By definition, we have that 0 <= Offset() <= Len().
 	Offset() int64
-	//
-	String(len int) string
 }
 
-func NewBytesReadWriter(buffer unsafe.Pointer, size int64) (BytesReadWriter, error) {
-	if size < 0 || size > math.MaxInt {
-		return nil, fmt.Errorf(sizeErrorFmt, size)
+// NewBytesReadWriter creates a new instance of BytesReadWriter by wrapping the memory pointed
+// by the buffer argument. The length argument is the total number of accessible bytes
+// for reading and writing. The capacity argument is the number of bytes in the given buffer.
+//
+// Note that the capacity cannot be changed after creation, and that the length cannot ever exceed
+// the capacity.
+func NewBytesReadWriter(buffer unsafe.Pointer, length, capacity int64) (BytesReadWriter, error) {
+	if buffer == nil {
+		return nil, fmt.Errorf(bufferErrorFmt)
+	}
+	if capacity < 0 || capacity > math.MaxInt {
+		return nil, fmt.Errorf(capacityErrorFmt, capacity)
+	}
+	if length < 0 || length > capacity {
+		return nil, fmt.Errorf(lengthErrorFmt, length)
 	}
 	// Inspired by: https://stackoverflow.com/a/66218124
 	var bytes []byte
 	(*reflect.SliceHeader)(unsafe.Pointer(&bytes)).Data = uintptr(buffer)
-	(*reflect.SliceHeader)(unsafe.Pointer(&bytes)).Len = int(size)
-	(*reflect.SliceHeader)(unsafe.Pointer(&bytes)).Cap = int(size)
+	(*reflect.SliceHeader)(unsafe.Pointer(&bytes)).Len = int(capacity)
+	(*reflect.SliceHeader)(unsafe.Pointer(&bytes)).Cap = int(capacity)
 	return &bytesReadWriter{
 		buffer:     buffer,
 		bytesAlias: bytes,
 		offset:     0,
-		size:       size,
+		len:        length,
 	}, nil
 }
 
 type bytesReadWriter struct {
 	offset     int64
-	size       int64
+	len        int64
 	buffer     unsafe.Pointer
 	bytesAlias []byte
 }
@@ -91,8 +109,8 @@ func (b *bytesReadWriter) Read(p []byte) (n int, err error) {
 	n = 0
 	pLen := len(p)
 	for i := 0; i < pLen; i++ {
-		if b.offset >= b.size {
-			err = io.ErrShortBuffer
+		if b.offset >= b.len {
+			err = io.EOF
 			return
 		}
 		p[i] = b.bytesAlias[b.offset]
@@ -105,7 +123,7 @@ func (b *bytesReadWriter) Read(p []byte) (n int, err error) {
 func (b *bytesReadWriter) Write(p []byte) (n int, err error) {
 	n = 0
 	for _, v := range p {
-		if b.offset >= b.size {
+		if b.offset >= b.len {
 			err = io.ErrShortWrite
 			return
 		}
@@ -116,12 +134,18 @@ func (b *bytesReadWriter) Write(p []byte) (n int, err error) {
 	return
 }
 
-func (b *bytesReadWriter) Size() int64 {
-	return b.size
+func (b *bytesReadWriter) Len() int64 {
+	return b.len
 }
 
-func (b *bytesReadWriter) SetSize(size int64) {
-	b.size = size
+func (b *bytesReadWriter) SetLen(len int64) {
+	if len < 0 {
+		b.len = 0
+	} else if len > int64(cap(b.bytesAlias)) {
+		b.len = int64(cap(b.bytesAlias))
+	} else {
+		b.len = len
+	}
 }
 
 func (b *bytesReadWriter) Offset() int64 {
@@ -135,19 +159,19 @@ func (b *bytesReadWriter) Seek(offset int64, whence int) (int64, error) {
 	switch whence {
 	case io.SeekStart:
 		b.offset = offset
-		if offset > b.size {
+		if offset > b.len {
 			return b.offset, fmt.Errorf(offsetErrorFmt, offset)
 		}
 	case io.SeekCurrent:
-		if offset > b.size-b.offset {
+		if offset > b.len-b.offset {
 			return b.offset, fmt.Errorf(offsetErrorFmt, offset)
 		}
 		b.offset = b.offset + offset
 	case io.SeekEnd:
-		if offset > b.size {
+		if offset > b.len {
 			return b.offset, fmt.Errorf(offsetErrorFmt, offset)
 		}
-		b.offset = b.size - offset
+		b.offset = b.len - offset
 	default:
 		return b.offset, fmt.Errorf(whenceErrorFmt, whence)
 	}
@@ -155,23 +179,6 @@ func (b *bytesReadWriter) Seek(offset int64, whence int) (int64, error) {
 	return b.offset, nil
 }
 
-func (b *bytesReadWriter) Buffer() unsafe.Pointer {
+func (b *bytesReadWriter) BufferPtr() unsafe.Pointer {
 	return b.buffer
-}
-
-func (b *bytesReadWriter) String(len int) string {
-	var res string
-	(*reflect.StringHeader)(unsafe.Pointer(&res)).Data = uintptr(b.buffer)
-	(*reflect.StringHeader)(unsafe.Pointer(&res)).Len = len
-	return res
-}
-
-func CString(charPtr unsafe.Pointer) string {
-	len := int(C.strlen((*C.char)(charPtr)))
-	buf, err := NewBytesReadWriter(charPtr, int64(len+1))
-	if err != nil {
-		// Should we log here?
-		return ""
-	}
-	return buf.String(len)
 }
