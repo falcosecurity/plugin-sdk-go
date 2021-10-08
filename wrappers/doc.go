@@ -16,10 +16,14 @@ limitations under the License.
 
 // The functions in this package provide "wrappers" that make it
 // easier to implement plugin functions like plugin_extract_fields,
-// plugin_next, plugin_next_batch, and plugin_register_async_extractor
-// in Go. They primarily take function arguments that interact with go types
-// and take care of the conversion from/to C types, iterating over C
-// structs, etc.
+// plugin_next, and plugin_next_batch in Go. They primarily take
+// function arguments that interact with go types and take care of the
+// conversion from/to C types, iterating over C structs, etc.
+//
+// Including this package will automatically define the plugin api
+// function plugin_extract_fields(). In turn, that C function will
+// call go-specific functions that work on go types and take care of
+// the details of type conversion for the plugin.
 //
 // If https://github.com/golang/go/issues/13467 were fixed, this
 // function signature could directly use the C functions (and their C

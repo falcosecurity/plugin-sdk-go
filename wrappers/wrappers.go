@@ -17,57 +17,7 @@ limitations under the License.
 package wrappers
 
 /*
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <stdbool.h>
-
-typedef struct ss_plugin_event
-{
-	uint64_t evtnum;
-	uint8_t *data;
-	uint32_t datalen;
-	uint64_t ts;
-} ss_plugin_event;
-
-typedef struct ss_plugin_extract_field
-{
-	const char *field;
-	const char *arg;
-	uint32_t ftype;
-
-	bool field_present;
-	char *res_str;
-	uint64_t res_u64;
-} ss_plugin_extract_field;
-
-typedef bool (*cb_wait_t)(void* wait_ctx);
-
-typedef struct async_extractor_info
-{
-	// Pointer as this allows swapping out events from other
-	// structs.
-	const ss_plugin_event *evt;
-	ss_plugin_extract_field *field;
-	int32_t rc;
-	cb_wait_t cb_wait;
-	void* wait_ctx;
-} async_extractor_info;
-
-bool wait_bridge(async_extractor_info *info)
-{
-	return info->cb_wait(info->wait_ctx);
-};
-
-void fill_event(ss_plugin_event *evts, int idx, uint8_t *data, uint32_t datalen, uint64_t ts)
-{
-   evts[idx].data = data;
-   evts[idx].datalen = datalen;
-   evts[idx].ts = ts;
-}
-
-
+#include "wrappers.h"
 */
 import "C"
 import (
@@ -76,54 +26,23 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go"
 )
 
-// PluginExtractStrFunc is used when setting up an async extractor via
-// RegisterAsyncExtractors or when extacting fields using WrapExtractFuncs.
+// PluginExtractStrFunc is used when using RegisterExtractors or
+// RegisterAsyncExtractors.
 //
 // The return value should be (field present as bool, extracted value)
 type PluginExtractStrFunc func(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, string)
 
-// PluginExtractU64Func is used when setting up an async extractor via
-// RegisterAsyncExtractors or when extacting fields using WrapExtractFuncs.
+// PluginExtractU64Func is used when using RegisterExtractors or
+// RegisterAsyncExtractors.
 //
 // The return value should be (field present as bool, extracted value)
 type PluginExtractU64Func func(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, uint64)
 
-// WrapExtractFuncs allows a plugin to define higher-level go
-// functions that work with go types to return field
-// values. WrapExtractFuncs will call the provided functions to
-// extract values based on the field type and take care of the
-// conversion between go types and C types as well as iterating over an
-// array of ss_plugin_extract_field structs.
-//
-// Here's an example:
-//    func MyExtractStrFunc(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, string) {
-//        switch field {
-//        case "plugin.field1":
-//            return true, "some-value-for-field-from-event"
-//        default:
-//             return false, ""
-//        }
-//
-//        return false, ""
-//    }
-//
-//    func MyExtractU64Func(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, uint64) {
-//        switch field {
-//        case "plugin.field1":
-//            var someValueForFieldFromEvent uint64 = 282;
-//            return true, someValueForFieldFromEvent
-//        default:
-//        return false, 0
-//        }
-//
-//        return false, 0
-//    }
-//
-//    //export plugin_extract_fields
-//    func plugin_extract_fields(plgState unsafe.Pointer, evt *C.struct_ss_plugin_event, numFields uint32, fields *C.struct_ss_plugin_extract_field) int32 {
-//       return wrappers.WrapExtractFuncs(plgState, unsafe.Pointer(evt), numFields, unsafe.Pointer(fields), MyExtractStrFunc, MyExtractu64Func)
-//    }
-func WrapExtractFuncs(plgState unsafe.Pointer, evt unsafe.Pointer, numFields uint32, fields unsafe.Pointer,
+// These functions will be called by the sdk and are set in RegisterExtractors()/RegisterAsyncExtractors
+var extractStrFunc PluginExtractStrFunc
+var extractU64Func PluginExtractU64Func
+
+func wrapExtractFuncs(plgState unsafe.Pointer, evt unsafe.Pointer, numFields uint32, fields unsafe.Pointer,
 	strExtractorFunc PluginExtractStrFunc,
 	u64ExtractorFunc PluginExtractU64Func) int32 {
 
@@ -159,44 +78,93 @@ func WrapExtractFuncs(plgState unsafe.Pointer, evt unsafe.Pointer, numFields uin
 	return sdk.SSPluginSuccess
 }
 
-// RegisterAsyncExtractors is a helper function to be used within plugin_register_async_extractor.
+// RegisterExtractors (and its analog RegisterAsyncExtractors) allows a plugin
+// to define higher-level go functions that work with go types to
+// return field values.
 //
-// Intended usage as in the following example:
+// A plugin should call *either* RegisterExtractors or
+// RegisterAsyncExtractors, exactly once, in the implementation of
+// plugin_init(). The difference is that calling RegisterExtractors
+// implements synchronous field extraction--a framework call to
+// plugin_extract_fields() is handled directly by the plugin, via the
+// wrapper.
 //
-//     // A function to extract a single string field from an event
-//     func extract_str(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, string) {
+// RegisterAsyncExtractors uses a more advanced, resource intensive
+// approach to amortize the overhead of Cgo function calls across
+// multiple calls to `extract_fields()`. Only use
+// RegisterAsyncExtractors when a plugin is expected to generate a
+// high volume of events (e.g. > 1000/second).
+//
+// Both RegisterExtractors/RegisterAsyncExtractors will call the provided
+// functions to extract values based on the field type and take care
+// of the conversion between go types and C types as well as iterating
+// over an array of ss_plugin_extract_field structs.
+//
+// Here's an example:
+//    func MyExtractStrFunc(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, string) {
+//        switch field {
+//        case "plugin.field1":
+//            return true, "some-value-for-field-from-event"
+//        default:
+//             return false, ""
+//        }
+//
+//        return false, ""
+//    }
+//
+//    func MyExtractU64Func(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, uint64) {
+//        switch field {
+//        case "plugin.field1":
+//            var someValueForFieldFromEvent uint64 = 282;
+//            return true, someValueForFieldFromEvent
+//        default:
+//        return false, 0
+//        }
+//
+//        return false, 0
+//    }
+//
+//    // Inside of plugin_init()
+//    func plugin_init(config *C.char, rc *int32) unsafe.Pointer {
 //       ...
-//     }
+//       wrappers.RegisterExtractors(extract_str, extract_u64)
+//    }
+func RegisterExtractors(strExtractorFunc PluginExtractStrFunc, u64ExtractorFunc PluginExtractU64Func) {
+	extractStrFunc = strExtractorFunc
+	extractU64Func = u64ExtractorFunc
+}
+
+// RegisterAsyncExtractors (and its analog RegisterExtractors) allows a plugin
+// to define higher-level go functions that work with go types to
+// return field values.
 //
-//     // A function to extract a single uint64 field from an event
-//     func extract_u64(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, uint64) {
+// See the documentation for RegisterExtractors for more
+// information. In most cases, this function is not required and a
+// plugin should use RegisterExtractors instead.
+//
+// Here's an example:
+//    func MyExtractStrFunc(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, string) {
+//        ...
+//    }
+//
+//    func MyExtractU64Func(pluginState unsafe.Pointer, evtnum uint64, data []byte, ts uint64, field string, arg string) (bool, uint64) {
+//        ...
+//    }
+//
+//    // Inside of plugin_init()
+//    func plugin_init(config *C.char, rc *int32) unsafe.Pointer {
 //       ...
-//     }
-//
-//     //export plugin_register_async_extractor
-//     func plugin_register_async_extractor(pluginState unsafe.Pointer, asyncExtractorInfo unsafe.Pointer) int32 {
-//       return sinsp.RegisterAsyncExtractors(pluginState, asyncExtractorInfo, plugin_extract_str)
-//     }
-//
-//
-// This function handles the details of coordinating with the plugin
-// framework to wait for requests from the framework, calling
-// strExtractorFunc/u64ExtractorFunc functions as needed, and
-// returning values back to the plugin framework.
-//
-// If your plugin will return a high rate of events (e.g. >1000 sec)
-// and you plan on using async field extraction in your plugin, you
-// should always use this function inside
-// plugin_register_async_extractor.
+//       // Spawns a spinlock goroutine to coordinate with the plugin framework.
+//       wrappers.RegisterAsyncExtractors(plgState, extract_str, extract_u64)
+//    }
 func RegisterAsyncExtractors(
 	pluginState unsafe.Pointer,
-	asyncExtractorInfo unsafe.Pointer,
 	strExtractorFunc PluginExtractStrFunc,
 	u64ExtractorFunc PluginExtractU64Func,
-) int32 {
+) {
+	info := C.create_async_extractor()
 	go func() {
-		info := (*C.async_extractor_info)(asyncExtractorInfo)
-		for C.wait_bridge(info) {
+		for C.async_extractor_wait(info) {
 			info.rc = C.int32_t(sdk.SSPluginSuccess)
 
 			dataBuf := C.GoBytes(unsafe.Pointer(info.evt.data), C.int(info.evt.datalen))
@@ -234,7 +202,24 @@ func RegisterAsyncExtractors(
 			}
 		}
 	}()
-	return sdk.SSPluginSuccess
+}
+
+// UnregisterAsyncExtractors() stops the goroutine started in
+// RegisterAsyncExtractors(). If a plugin called
+// RegisterAsyncExtractors() in plugin_init, it should call
+// UnregisterAsyncExtractors during plugin_destory.
+func UnregisterAsyncExtractors() {
+	C.destroy_async_extractor()
+}
+
+//export plugin_extract_fields_sync
+func plugin_extract_fields_sync(plgState unsafe.Pointer, evt *C.ss_plugin_event, numFields uint32, fields *C.ss_plugin_extract_field) int32 {
+
+	if extractStrFunc == nil || extractU64Func == nil {
+		return sdk.SSPluginFailure
+	}
+
+	return wrapExtractFuncs(plgState, unsafe.Pointer(evt), numFields, unsafe.Pointer(fields), extractStrFunc, extractU64Func)
 }
 
 // NextFunc is the function type required by NextBatch().
@@ -313,12 +298,14 @@ func NextBatch(plgState unsafe.Pointer, openState unsafe.Pointer, nextf NextFunc
 // package (See https://github.com/golang/go/issues/13467)
 func Events(evts []*sdk.PluginEvent) unsafe.Pointer {
 	ret := (*C.ss_plugin_event)(C.malloc((C.ulong)(len(evts))*C.sizeof_ss_plugin_event))
-	for i, evt := range evts {
-		C.fill_event(ret,
-			(C.int)(i),
-			(*C.uchar)(C.CBytes(evt.Data)),
-			(C.uint)(len(evt.Data)),
-			(C.uint64_t)(evt.Timestamp))
+
+	// https://github.com/golang/go/wiki/cgo#turning-c-arrays-into-go-slices
+	length := len(evts)
+	cevts := (*[1 << 28]C.ss_plugin_event)(unsafe.Pointer(ret))[:length:length]
+	for i := 0; i < length; i++ {
+		cevts[i].data = (*C.uchar)(C.CBytes(evts[i].Data))
+		cevts[i].datalen = (C.uint)(len(evts[i].Data))
+		cevts[i].ts = (C.uint64_t)(evts[i].Timestamp)
 	}
 
 	return (unsafe.Pointer)(ret)
