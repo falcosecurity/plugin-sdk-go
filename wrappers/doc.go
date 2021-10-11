@@ -29,4 +29,9 @@ limitations under the License.
 // function signature could directly use the C functions (and their C
 // types) used by the API. Since we can't, we use go native types
 // instead and change their return values to be more golang-friendly.
+//
+// If a plugin imports plugin-sdk-go/wrappers, it should also import
+// the package plugin-sdk-go/free. This defines a plugin_free_mem
+// function that frees memory allocated by the wrapper functions and
+// passed to the plugin framework.
 package wrappers
