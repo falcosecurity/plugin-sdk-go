@@ -32,16 +32,6 @@ enum async_extractor_state
 
 static async_extractor_info *s_async_extractor_ctx = NULL;
 
-static bool async_extractor_compare_exchange(async_extractor_info *ainfo,
-					     enum async_extractor_state *expected_val,
-					     enum async_extractor_state desired_val)
-{
-	bool weak = false;
-	int success_memorder =  __ATOMIC_SEQ_CST;
-	int failure_memorder =  __ATOMIC_SEQ_CST;
-	return __atomic_compare_exchange_n(&ainfo->lock, expected_val, desired_val, weak, success_memorder, failure_memorder);
-}
-
 // Source: https://ftp.gnu.org/old-gnu/Manuals/glibc-2.2.5/html_node/Elapsed-Time.html
 static int
 timeval_subtract (result, x, y)
@@ -70,7 +60,7 @@ timeval_subtract (result, x, y)
 
 bool async_extractor_wait(async_extractor_info *ainfo)
 {
-	ainfo->lock = DONE;
+	atomic_store_explicit(&ainfo->lock, DONE, memory_order_seq_cst);
 	uint64_t ncycles = 0;
 	bool sleeping = false;
 
@@ -84,12 +74,12 @@ bool async_extractor_wait(async_extractor_info *ainfo)
 	struct timeval start_time;
 	gettimeofday(&start_time, NULL);
 
-	while(!async_extractor_compare_exchange(ainfo, &old_val, PROCESSING))
+	while(!atomic_compare_exchange_strong_explicit(&ainfo->lock, &old_val, PROCESSING, memory_order_seq_cst, memory_order_seq_cst))
 	{
 		// shutdown
 		if(old_val == SHUTDOWN_REQ)
 		{
-			ainfo->lock = SHUTDOWN_DONE;
+			atomic_store_explicit(&ainfo->lock, SHUTDOWN_DONE, memory_order_seq_cst);
 			return false;
 		}
 		old_val = INPUT_READY;
@@ -123,20 +113,19 @@ bool async_extractor_wait(async_extractor_info *ainfo)
 
 static void async_extractor_init(async_extractor_info *ainfo)
 {
-	ainfo->lock = INIT;
+	atomic_store_explicit(&ainfo->lock, INIT, memory_order_seq_cst);
 }
 
 static void async_extractor_shutdown(async_extractor_info *ainfo)
 {
 	enum async_extractor_state old_val = DONE;
-	while (async_extractor_compare_exchange(ainfo, &old_val, SHUTDOWN_REQ))
+	while (atomic_compare_exchange_strong_explicit(&ainfo->lock, &old_val, SHUTDOWN_REQ, memory_order_seq_cst, memory_order_seq_cst))
 	{
 		old_val = DONE;
 	}
-
+	
 	// await shutdown
-	// XXX/mstemm add a timeout to this
-	while (ainfo->lock != SHUTDOWN_DONE);
+	while(atomic_load_explicit(&ainfo->lock, memory_order_seq_cst) != SHUTDOWN_DONE);
 }
 
 static int32_t async_extractor_extract_field(async_extractor_info *ainfo,
@@ -147,7 +136,7 @@ static int32_t async_extractor_extract_field(async_extractor_info *ainfo,
 	ainfo->field = field;
 
 	enum async_extractor_state old_val = DONE;
-	while (!async_extractor_compare_exchange(ainfo, &old_val, INPUT_READY))
+	while (!atomic_compare_exchange_strong_explicit(&ainfo->lock, &old_val, INPUT_READY, memory_order_seq_cst, memory_order_seq_cst))
 	{
 		old_val = DONE;
 	}
@@ -155,7 +144,7 @@ static int32_t async_extractor_extract_field(async_extractor_info *ainfo,
 	//
 	// Once INPUT_READY state has been aquired, wait for worker completition
 	//
-	while(ainfo->lock != DONE);
+	while(atomic_load_explicit(&ainfo->lock, memory_order_seq_cst) != DONE);
 
 	// rc now contains the error code for the extraction.
 	return ainfo->rc;
