@@ -18,6 +18,7 @@ limitations under the License.
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdatomic.h>
 
 typedef void ss_plugin_t;
 
@@ -49,10 +50,10 @@ typedef struct async_extractor_info
 {
 	// Pointer as this allows swapping out events from other
 	// structs.
+	atomic_int lock;
 	const ss_plugin_event *evt;
 	ss_plugin_extract_field *field;
 	int32_t rc;
-	int lock;
 } async_extractor_info;
 
 async_extractor_info * create_async_extractor();
