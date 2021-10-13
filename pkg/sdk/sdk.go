@@ -40,6 +40,8 @@ import (
 	"math"
 	"runtime"
 	"unsafe"
+
+	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
 )
 
 // Functions that return or update a rc (e.g. plugin_init,
@@ -244,7 +246,7 @@ type PluginEvents interface {
 	ArrayPtr() unsafe.Pointer
 }
 type pluginEvent struct {
-	data        BytesReadWriter
+	data        ptr.BytesReadWriter
 	dataSize    int64
 	ssPluginEvt unsafe.Pointer
 }
@@ -303,7 +305,7 @@ func newPluginEvent(evtPtr unsafe.Pointer, dataSize int64) (*pluginEvent, error)
 	// todo(jasondellaluce, leogr): optimize this to leverage memory locality.
 	evt.data = (*C.uchar)(C.malloc(C.size_t(dataSize)))
 	evt.datalen = 0
-	brw, err := NewBytesReadWriter(unsafe.Pointer(evt.data), int64(dataSize), int64(dataSize))
+	brw, err := ptr.NewBytesReadWriter(unsafe.Pointer(evt.data), int64(dataSize), int64(dataSize))
 
 	if err != nil {
 		return nil, err

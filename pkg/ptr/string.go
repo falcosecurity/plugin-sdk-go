@@ -1,4 +1,4 @@
-package sdk
+package ptr
 
 import (
 	"reflect"

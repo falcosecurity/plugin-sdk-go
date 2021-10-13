@@ -24,7 +24,8 @@ import (
 	"io"
 	"unsafe"
 
-	sdk "github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
+	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
+	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 )
 
 // PluginExtractStrFunc is used when using RegisterExtractors or
@@ -51,7 +52,7 @@ func wrapExtractFuncs(plgState unsafe.Pointer, evt unsafe.Pointer, numFields uin
 
 	// https://github.com/golang/go/wiki/cgo#turning-c-arrays-into-go-slices
 	flds := (*[1 << 28]C.struct_ss_plugin_extract_field)(unsafe.Pointer(fields))[:numFields:numFields]
-	dataBuf, err := sdk.NewBytesReadWriter(unsafe.Pointer(event.data), int64(event.datalen), int64(event.datalen))
+	dataBuf, err := ptr.NewBytesReadWriter(unsafe.Pointer(event.data), int64(event.datalen), int64(event.datalen))
 	if err != nil {
 		// todo(jasondellaluce,leogr): error is lost here, what to do?
 		return sdk.SSPluginFailure
@@ -59,8 +60,8 @@ func wrapExtractFuncs(plgState unsafe.Pointer, evt unsafe.Pointer, numFields uin
 
 	var i uint32
 	for i = 0; i < numFields; i++ {
-		fieldStr := sdk.GoString(unsafe.Pointer(flds[i].field))
-		argStr := sdk.GoString(unsafe.Pointer(flds[i].arg))
+		fieldStr := ptr.GoString(unsafe.Pointer(flds[i].field))
+		argStr := ptr.GoString(unsafe.Pointer(flds[i].arg))
 
 		switch uint32(flds[i].ftype) {
 		case sdk.ParamTypeCharBuf:
@@ -172,9 +173,9 @@ func RegisterAsyncExtractors(
 		for C.async_extractor_wait(info) {
 			info.rc = C.int32_t(sdk.SSPluginSuccess)
 
-			fieldStr := sdk.GoString(unsafe.Pointer(info.field.field))
-			argStr := sdk.GoString(unsafe.Pointer(info.field.arg))
-			dataBuf, err := sdk.NewBytesReadWriter(unsafe.Pointer(info.evt.data), int64(info.evt.datalen), int64(info.evt.datalen))
+			fieldStr := ptr.GoString(unsafe.Pointer(info.field.field))
+			argStr := ptr.GoString(unsafe.Pointer(info.field.arg))
+			dataBuf, err := ptr.NewBytesReadWriter(unsafe.Pointer(info.evt.data), int64(info.evt.datalen), int64(info.evt.datalen))
 			if err != nil {
 				// todo(jasondellaluce,leogr): error is lost here, what to do?
 				info.rc = C.int32_t(sdk.SSPluginFailure)
