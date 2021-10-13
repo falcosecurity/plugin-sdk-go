@@ -24,7 +24,7 @@ import (
 	"io"
 	"unsafe"
 
-	sdk "github.com/falcosecurity/plugin-sdk-go"
+	sdk "github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 )
 
 // PluginExtractStrFunc is used when using RegisterExtractors or

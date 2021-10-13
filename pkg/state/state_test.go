@@ -14,53 +14,51 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package state_test
+package state
 
 import (
 	"unsafe"
-
-	"github.com/falcosecurity/plugin-sdk-go/state"
 )
 
 var plgState unsafe.Pointer
 
-func ExampleNewStateContainer() (unsafe.Pointer) {
+func ExampleNewStateContainer() unsafe.Pointer {
 
 	type pluginState struct {
 		// State for a created plugin goes here
 	}
 
 	// Inside plugin_init(config *C.char, rc *int32) unsafe.Pointer) {
-	sobj := state.NewStateContainer()
+	sobj := NewStateContainer()
 	pCtx := &pluginState{}
-	state.SetContext(sobj, unsafe.Pointer(pCtx))
+	SetContext(sobj, unsafe.Pointer(pCtx))
 	return sobj
 	// }
 }
 
-func ExampleSetContext() (unsafe.Pointer) {
+func ExampleSetContext() unsafe.Pointer {
 
 	type pluginState struct {
 		// State for a created plugin goes here
 	}
 
 	// Inside plugin_init(config *C.char, rc *int32) unsafe.Pointer) {
-	sobj := state.NewStateContainer()
+	sobj := NewStateContainer()
 	pCtx := &pluginState{}
-	state.SetContext(sobj, unsafe.Pointer(pCtx))
+	SetContext(sobj, unsafe.Pointer(pCtx))
 	return sobj
 	// }
 }
 
-func ExampleContext() (string) {
+func ExampleContext() string {
 
 	type pluginState struct {
 		// State for a created plugin goes here
-		lastError       string
+		lastError string
 	}
 
 	// Inside plugin_get_last_error(plgState unsafe.Pointer) *C.char {
-	pCtx := (*pluginState)(state.Context(plgState))
+	pCtx := (*pluginState)(Context(plgState))
 	// Can now access pCtx as a pluginState struct
 	return pCtx.lastError
 	// }
@@ -68,7 +66,6 @@ func ExampleContext() (string) {
 
 func ExampleFree() {
 	// inside plugin_destroy(plgState unsafe.Pointer) {
-	state.Free(plgState)
+	Free(plgState)
 	// }
 }
-
