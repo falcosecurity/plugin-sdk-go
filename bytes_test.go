@@ -3,6 +3,7 @@ package sdk
 import (
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"reflect"
 	"testing"
 	"unsafe"
@@ -99,7 +100,7 @@ func TestBytesReadWriterReadAll(t *testing.T) {
 	}
 
 	// Read the whole buffer and check for the expected content
-	res, err := io.ReadAll(bytesReadWriter)
+	res, err := ioutil.ReadAll(bytesReadWriter)
 	if err != nil {
 		t.Error(err)
 	} else if len(res) != len(bytes) {

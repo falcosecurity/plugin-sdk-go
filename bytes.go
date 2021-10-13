@@ -24,7 +24,6 @@ import "C"
 import (
 	"fmt"
 	"io"
-	"math"
 	"reflect"
 	"unsafe"
 )
@@ -35,6 +34,13 @@ const (
 	capacityErrorFmt = "invalid capacity value %d"
 	whenceErrorFmt   = "invalid whence value %d"
 	bufferErrorFmt   = "invalid buffer value"
+)
+
+// Integer limit values.
+// todo: math.MaxInt was introduced by golang 1.17 (see https://golang.org/doc/go1.17)
+const (
+	intSize = 32 << (^uint(0) >> 63) // 32 or 64
+	maxInt  = 1<<(intSize-1) - 1
 )
 
 // BytesReadWriter is an opaque wrapper for fixed-size memory buffers, that can safely be
@@ -79,7 +85,7 @@ func NewBytesReadWriter(buffer unsafe.Pointer, length, capacity int64) (BytesRea
 	if buffer == nil {
 		return nil, fmt.Errorf(bufferErrorFmt)
 	}
-	if capacity < 0 || capacity > math.MaxInt {
+	if capacity < 0 || capacity > maxInt {
 		return nil, fmt.Errorf(capacityErrorFmt, capacity)
 	}
 	if length < 0 || length > capacity {
