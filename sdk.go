@@ -22,13 +22,8 @@ const (
 	SSPluginSuccess         int32 = 0
 	SSPluginFailure         int32 = 1
 	SSPluginTimeout         int32 = -1
-	SSPluginIllegalInput    int32 = 3
-	SSPluginNotFound        int32 = 4
-	SSPluginInputTooSmall   int32 = 5
-	SSPluginEOF             int32 = 6
-	SSPluginUnexpectedBlock int32 = 7
-	SSPluginVersionMismatch int32 = 8
-	SSPluginNotSupported    int32 = 9
+	SSPluginEOF             int32 = 2
+	SSPluginNotSupported    int32 = 3
 )
 
 // One of these values should be returned by plugin_get_type().
