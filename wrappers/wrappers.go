@@ -258,22 +258,16 @@ func NextBatch(plgState unsafe.Pointer, openState unsafe.Pointer, nextf NextFunc
 		evt, res = nextf(plgState, openState)
 		if res == sdk.SSPluginSuccess {
 			evts = append(evts, evt)
-		} else if res == sdk.SSPluginEOF {
-			// Return success but stop
-			res = sdk.SSPluginSuccess
-			break
-		} else if res == sdk.SSPluginTimeout {
-			// Return success if there are any events
-			// queued up, otherwise pass the timeout
-			// along.
-			if len(evts) > 0 {
-				res = sdk.SSPluginSuccess
-			}
-
-			break
 		} else {
 			break
 		}
+	}
+
+	// If the last result was Timeout/EOF, but there actually are
+	// some events, return success instead. (This could happen if
+	// nextf returned some events and then a Timeout/EOF).
+	if (res == sdk.SSPluginTimeout || res == sdk.SSPluginEOF) && len(evts) > 0 {
+		res = sdk.SSPluginSuccess
 	}
 
 	return evts, res
