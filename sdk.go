@@ -34,7 +34,7 @@ const (
 
 // The data payload allocated and returned in a call to
 // plugin_next/plugin_next_batch() should not be larger than this.
-const MaxEvtSize uint32 = 65635
+const MaxEvtSize uint32 = 65535
 
 // The maximum number of events to return from a call to
 // plugin_next_batch when using the wrapper function NextBatch().
