@@ -26,17 +26,46 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
 )
 
+// ExtractRequest represents an high-level abstraction that wraps a pointer to
+// a ss_plugin_extract_field C structure, providing methods for accessing its
+// fields in a go-friently way.
 type ExtractRequest interface {
+	// FieldID returns id of the field, as of its index in the list of fields
+	// returned by plugin_get_fields
 	FieldID() uint64
+	//
+	// Field returns the name of the field for which the value extraction
+	// is requested.
 	Field() string
+	//
+	// Arg returns the argument passed for the requested field. An empty string
+	// is returned if no argument is specified.
 	Arg() string
+	//
+	// SetStrValue sets the extracted value for the requested field.
+	// This must be used for fields of string value type only.
 	SetStrValue(v string)
+	//
+	// SetU64Value sets the extracted value for the requested field.
+	// This must be used for fields of u64 value type only.
 	SetU64Value(v uint64)
-	SetPtr(unsafe.Pointer) // ?
+	//
+	// SetPtr sets a pointer to a ss_plugin_extract_field C structure to
+	// be wrapped in this instance of ExtractRequest.
+	SetPtr(unsafe.Pointer)
 }
 
+// ExtractRequestPool represents a pool of reusable ExtractRequest objects.
+// Each ExtractRequest can be reused by calling its SetPtr method to wrap
+// a new ss_plugin_extract_field C structure pointer.
 type ExtractRequestPool interface {
+	// Get returns an instance of ExtractRequest at the requestIndex
+	// position inside the pool. Indexes can be non-contiguous.
 	Get(requestIndex int) ExtractRequest
+	//
+	// Free deallocates any memory used by the pool that can't be disposed
+	// through garbage collection. The behavior of Free after the first call
+	// is undefined.
 	Free()
 }
 
@@ -61,6 +90,7 @@ func (e *extractRequestPool) Free() {
 	}
 }
 
+// NewExtractRequestPool returns a new empty ExtractRequestPool.
 func NewExtractRequestPool() ExtractRequestPool {
 	pool := &extractRequestPool{
 		reqs: make(map[uint]*extractRequest),

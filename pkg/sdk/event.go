@@ -24,7 +24,6 @@ import "C"
 import (
 	"fmt"
 	"io"
-	"math"
 	"unsafe"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
@@ -45,15 +44,15 @@ type EventWriter interface {
 	// Each invocation of Writer clears the event data and sets its
 	// size to zero. As such, consequent invocations of Writer can
 	// potentially return two distinct instances of io.Writer, and
-	// that any data written inside the event will be erased.
+	// any data written inside the event would be erased.
 	Writer() io.Writer
 	//
 	// SetTimestamp sets the timestamp of the event.
 	SetTimestamp(value uint64)
 }
 
-// EventReader can be used to represent events.
-// This interface is meant to be used in the extraction flow.
+// EventReader can be used to represent events passed by the framework
+// to the plugin. This interface is meant to be used during extraction.
 //
 // Data inside an event can only be accessed in read-only mode
 // through the io.Reader interface returned by the Reader method.
@@ -80,56 +79,16 @@ type EventReader interface {
 // compliant with the symbols and APIs of the plugin framework.
 // The underlying C array can be accessed through the ArrayPtr method as
 // an unsafe.Pointer. Manually writing inside the C array might break the
-// internal logic of sdk.EventWriters thus leading to non-deterministic
-// behavior.
+// internal logic of sdk.EventWriters and lead to undefined behavior.
 //
 // This is intended to be used as a slab memory allocator. EventWriters
 // are supposed to be stored inside the plugin instance state to avoid
 // useless reallocations, and should be used to create plugin events and
-// write data in them. Unlike slices, the events contained in the list
+// write their data. Unlike slices, the events contained in the list
 // can only be accessed by using the Get and Len methods to enforce safe
 // memory accesses. Ideally, the list is meant to be large enough to contain
 // the maximum number of events that the plugin is capable of producing with
-// plugin_next_batch. The plugin_next symbol should only work on the first
-// event of the list instead.
-//
-// Here is an example of usage:
-//	func plugin_open(pState unsafe.Pointer, params *C.char, rc *int32) unsafe.Pointer {
-//		...
-//		// Create instance of sdk.EventWriters
-//		eventWriters, err := sdk.NewEventWriters(maxNextBatchEvents, int64(sdk.MaxEvtSize))
-//		if err != nil {
-//			*rc = sdk.SSPluginFailure
-//			return nil
-//		}
-//
-//		// Store eventWriters inside the plugin instance state
-//		is := &instanceState{
-//			...
-//			eventWriters:       eventWriters,
-//		}
-//		handle := state.NewStateContainer()
-//		state.SetContext(handle, unsafe.Pointer(is))
-//		*rc = sdk.SSPluginSuccess
-//		return handle
-//	}
-//
-//	func plugin_next(pState unsafe.Pointer, iState unsafe.Pointer, retEvt **C.ss_plugin_event) int32 {
-//		// Grab an instance of the event through sdk.EventWriters
-//		is := (*instanceState)(state.Context(iState))
-//		event := is.eventWriters.Get(0)
-//
-//		// Write the event data and set the timestamp
-//		eventData := "Sample event data... Hello World!"
-//		eventWriter := event.Writer()
-//		eventWriter.Write([]byte(eventData))
-//		event.SetTimestamp(uint64(time.Now().Unix()) * 1000000000)
-//
-//		// Set the result pointer to the internal event array buffer
-//		*retEvt = (*C.ss_plugin_event)(is.eventWriters.ArrayPtr())
-//		return sdk.SSPluginSuccess
-//	}
-//
+// plugin_next_batch.
 type EventWriters interface {
 	// Get returns an instance of sdk.EventWriter at the eventIndex
 	// position inside the list.
@@ -146,7 +105,10 @@ type EventWriters interface {
 	// Writing in the memory pointed by this pointer is unsafe and might
 	// lead to non-deterministic behavior.
 	ArrayPtr() unsafe.Pointer
-
+	//
+	// Free deallocates any memory used by the list that can't be disposed
+	// through garbage collection. The behavior of Free after the first call
+	// is undefined.
 	Free()
 }
 
@@ -208,7 +170,7 @@ type eventWriter struct {
 
 func newEventWriter(evtPtr unsafe.Pointer, dataSize int64) (*eventWriter, error) {
 	evt := (*C.ss_plugin_event)(evtPtr)
-	evt.ts = C.ulong(math.MaxUint64)
+	evt.ts = C.ulong(C.UINT64_MAX)
 	evt.data = (*C.uchar)(C.malloc(C.size_t(dataSize)))
 	evt.datalen = 0
 	brw, err := ptr.NewBytesReadWriter(unsafe.Pointer(evt.data), int64(dataSize), int64(dataSize))
@@ -249,22 +211,24 @@ func (p *eventWriter) free() {
 	p.data = nil
 }
 
-type eventReader uintptr
+type eventReader C.ss_plugin_event
 
+// NewEventReader wraps a pointer to a ss_plugin_event C structure to create
+// a new instance of EventReader. It's not possible to check that the pointer is valid.
+// Passing an invalid pointer may cause undefined behavior.
 func NewEventReader(ssPluginEvt unsafe.Pointer) EventReader {
-	return (eventReader)(ssPluginEvt)
+	return (*eventReader)(ssPluginEvt)
 }
 
-func (p eventReader) Reader() io.ReadSeeker {
-	evt := (*C.ss_plugin_event)(unsafe.Pointer(p))
-	brw, _ := ptr.NewBytesReadWriter(unsafe.Pointer(evt.data), int64(evt.datalen), int64(evt.datalen))
+func (e *eventReader) Reader() io.ReadSeeker {
+	brw, _ := ptr.NewBytesReadWriter(unsafe.Pointer(e.data), int64(e.datalen), int64(e.datalen))
 	return brw
 }
 
-func (p eventReader) Timestamp() uint64 {
-	return uint64((*C.ss_plugin_event)(unsafe.Pointer(p)).ts)
+func (e *eventReader) Timestamp() uint64 {
+	return uint64(e.ts)
 }
 
-func (p eventReader) EventNum() uint64 {
-	return uint64((*C.ss_plugin_event)(unsafe.Pointer(p)).evtnum)
+func (e *eventReader) EventNum() uint64 {
+	return uint64(e.evtnum)
 }

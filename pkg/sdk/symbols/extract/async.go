@@ -43,7 +43,7 @@ func StartAsync(e sdk.Extractor) {
 			info.rc = C.int32_t(sdk.SSPluginSuccess)
 			event = (*C.struct_ss_plugin_event)(info.evt)
 			field = (*C.struct_ss_plugin_extract_field)(info.field)
-			field.field_present = false // is this necessary?
+			field.field_present = false
 			extrReq = extrReqs.ExtractRequests().Get(int(field.field_id))
 			extrReq.SetPtr(unsafe.Pointer(field))
 

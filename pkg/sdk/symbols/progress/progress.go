@@ -14,6 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This package exports the following C function:
+// - char* plugin_get_progress(ss_plugin_t* s, ss_instance_t* h, uint32_t* progress_pct)
+//
+// The exported plugin_get_progress requires that both s and h are handles
+// of cgo.Handle from this SDK. The value of the s handle must implement
+// the sdk.PluginState interface. The value of the h handle must implement
+// the sdk.Progresser and sdk.ProgressBuffer interfaces.
+//
+// This function is part of the source_plugin_info interface as defined in
+// plugin_info.h. In almost all cases, your plugin should import this module,
+// unless your plugin exports those symbols by other means.
 package progress
 
 /*

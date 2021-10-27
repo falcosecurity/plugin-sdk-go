@@ -20,10 +20,14 @@ import (
 	"errors"
 )
 
-var (
-	ErrEOF     = errors.New("eof")
-	ErrTimeout = errors.New("timeout")
-)
+// ErrEOF is the error returned by next_batch when no new events
+// are available.
+var ErrEOF = errors.New("eof")
+
+// ErrTimeout is the error returned by next_batch when no new events
+// are available for the current batch, but may be available in the
+// next one.
+var ErrTimeout = errors.New("timeout")
 
 // Functions that return or update a rc (e.g. plugin_init,
 // plugin_open) should return one of these values.
@@ -41,12 +45,11 @@ const (
 	TypeExtractorPlugin uint32 = 2
 )
 
-// The data payload allocated and returned in a call to
-// plugin_next/plugin_next_batch() should not be larger than this.
+// The data payload allocated and returned in a call to plugin_next_batch()
+// should not be larger than this.
 const MaxEvtSize uint32 = 65535
 
-// The maximum number of events to return from a call to
-// plugin_next_batch when using the wrapper function NextBatch().
+// The maximum number of events to return from a call to plugin_next_batch().
 const MaxNextBatchEvents = 512
 
 // The full set of values that someday might be returned in the ftype

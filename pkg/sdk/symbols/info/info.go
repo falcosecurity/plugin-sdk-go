@@ -27,7 +27,7 @@ limitations under the License.
 //      char* get_extract_event_sources();
 //
 // In almost all cases, your plugin should import this module, unless
-// your plugin exports those symbols manually.
+// your plugin exports those symbols by other means.
 package info
 
 import "C"

@@ -14,12 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This package exports a C function plugin_get_last_error() which is used
-// by the plugin framework to get the last error set by the plugin.
+// This package exports the following C function:
+// - char* plugin_get_last_error(ss_plugin_t* s)
 //
-// In almost all cases, your plugin should import this module. The
-// *only* case where your plugin should not import this module is when
-// your plugin exports its own plugin_get_last_error manually.
+// The exported plugin_get_last_error requires s to be a handle
+// of cgo.Handle from this SDK. The value of the s handle must implement
+// the sdk.LastErrorBuffer interface, and either the error or the sdk.LastError
+// interfaces.
+//
+// This function is part of the source_plugin_info and extractor_plugin_info
+// interfaces as defined in plugin_info.h.
+// In almost all cases, your plugin should import this module, unless your
+// plugin exports those symbols by other means.
 package lasterr
 
 /*

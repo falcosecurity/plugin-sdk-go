@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This package provides support code for developers that would like
-// to write Falcosecurity Plugins (https://falco.org/docs/plugins/) in
-// Go. It provides consts/go structs for C values/structs used by the
-// plugins API, functions to create plugin and instance state, and
-// wrapping functions that allow for easy batch event injection and
-// asynchronous field extraction.
+// Package sdk provides definitions and constructs for developers that
+// would like to write Falcosecurity Plugins (https://falco.org/docs/plugins/)
+// in Go.
 //
-// Before using this package, review the developer's guide (https://falco.org/docs/plugins/developers_guide/) which fully documents the API and provides best practices for writing plugins. The developer's guide includes a walkthrough (https://falco.org/docs/plugins/developers_guide/#example-go-plugin-dummy) of a plugin written in Go that uses this package.
+// Before using this package, review the developer's guide
+// (https://falco.org/docs/plugins/developers_guide/) which fully documents
+// the API and provides best practices for writing plugins.
+// The developer's guide includes a walkthrough
+// (https://falco.org/docs/plugins/developers_guide/#example-go-plugin-dummy)
+// of a plugin written in Go that uses this package.
 package sdk
