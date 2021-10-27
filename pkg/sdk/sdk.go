@@ -16,6 +16,15 @@ limitations under the License.
 
 package sdk
 
+import (
+	"errors"
+)
+
+var (
+	ErrEOF     = errors.New("eof")
+	ErrTimeout = errors.New("timeout")
+)
+
 // Functions that return or update a rc (e.g. plugin_init,
 // plugin_open) should return one of these values.
 const (
