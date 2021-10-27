@@ -19,11 +19,11 @@ package sdk
 // Functions that return or update a rc (e.g. plugin_init,
 // plugin_open) should return one of these values.
 const (
-	SSPluginSuccess         int32 = 0
-	SSPluginFailure         int32 = 1
-	SSPluginTimeout         int32 = -1
-	SSPluginEOF             int32 = 2
-	SSPluginNotSupported    int32 = 3
+	SSPluginSuccess      int32 = 0
+	SSPluginFailure      int32 = 1
+	SSPluginTimeout      int32 = -1
+	SSPluginEOF          int32 = 2
+	SSPluginNotSupported int32 = 3
 )
 
 // One of these values should be returned by plugin_get_type().
@@ -91,27 +91,13 @@ const (
 	ParamTypeMax              uint32 = 44 // array size
 )
 
-// PluginEvent can be used to represent a single plugin event using go
-// types. It is used by the wrapper functions in the wrappers
-// sub-package to simplify the implementation of functions like
-// plugin_next/plugin_next_batch.
-//
-// The Evtnum field is assigned by the plugin framework. Therefore,
-// it's not required to fill in an Evtnum when returning events in
-// plugin_next.
-type PluginEvent struct {
-	Evtnum         uint64
-	Data           []byte
-	Timestamp      uint64
-}
-
 // FieldEntry represents a single field entry that an extractor plugin can expose.
 // Should be used when implementing plugin_get_fields().
 type FieldEntry struct {
-	Type               string `json:"type"`
-	Name               string `json:"name"`
-	ArgRequired        bool `json:"argRequired"`
-	Display            string `json:"display"`
-	Desc               string `json:"desc"`
-	Properties         string `json:"properties"`
+	Type        string `json:"type"`
+	Name        string `json:"name"`
+	ArgRequired bool   `json:"argRequired"`
+	Display     string `json:"display"`
+	Desc        string `json:"desc"`
+	Properties  string `json:"properties"`
 }
