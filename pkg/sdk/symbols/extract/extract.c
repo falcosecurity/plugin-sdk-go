@@ -18,7 +18,7 @@ limitations under the License.
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/time.h>
-#include "wrappers.h"
+#include "extract.h"
 
 enum async_extractor_state
 {
