@@ -42,17 +42,20 @@ func plugin_next_batch(pState C.uintptr_t, iState C.uintptr_t, nevts *uint32, re
 			events.Get(n).SetTimestamp(C.UINT64_MAX)
 			err = next.Next(pHandle.Value().(sdk.PluginState), events.Get(n))
 		}
+		if n > 0 && (err == sdk.ErrEOF || err == sdk.ErrTimeout) {
+			err = nil
+		}
 	}
 
 	*nevts = uint32(n)
 	*retEvts = (*C.ss_plugin_event)(events.ArrayPtr())
 	switch err {
+	case nil:
+		return sdk.SSPluginSuccess
 	case sdk.ErrEOF:
 		return sdk.SSPluginEOF
 	case sdk.ErrTimeout:
 		return sdk.SSPluginTimeout
-	case nil:
-		return sdk.SSPluginSuccess
 	default:
 		*nevts = uint32(0)
 		*retEvts = nil
