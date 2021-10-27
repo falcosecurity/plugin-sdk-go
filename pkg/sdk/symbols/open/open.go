@@ -14,6 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This package exports the following C functions:
+// - ss_instance_t* plugin_open(ss_plugin_t* s, char* params, ss_plugin_rc* rc)
+// - void plugin_close(ss_plugin_t* s, ss_instance_t* h)
+//
+// The exported plugin_open requires s to be a handle
+// of cgo.Handle from this SDK. The value of the s handle must implement
+// the sdk.LastError interface.
+//
+// The exported plugin_close requires h to be a handle
+// of cgo.Handle from this SDK. If the value of the h handle implements
+// the sdk.Closer interface, the function calls its Close method.
+// If sdk.Events is implemented the function calls the Free method
+// on the returned sdk.EventWriters. Finally, the function deletes the
+// h cgo.Handle.
+//
+// This function is part of the source_plugin_info interface as defined
+// in plugin_info.h.
+// In almost all cases, your plugin should import this module, unless your
+// plugin exports those symbols by other means.
 package open
 
 /*
@@ -29,8 +48,11 @@ var (
 	onOpenFn OnOpenFn
 )
 
+// OnOpenFn is a callback used in plugin_open.
 type OnOpenFn func(config string) (sdk.InstanceState, error)
 
+// SetOnInit sets an initialization callback to be called in plugin_open to
+// create the plugin instance state. If never set, plugin_open will panic.
 func SetOnOpen(fn OnOpenFn) {
 	if fn == nil {
 		panic("plugin-sdk-go/sdk/symbols/open.SetOnOpen: fn must not be nil")

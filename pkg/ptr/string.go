@@ -56,6 +56,12 @@ func GoString(charPtr unsafe.Pointer) string {
 	return res
 }
 
+// StringBuffer represents a buffer for C-allocated null-terminated strings
+// in a Go-friendly way. This is an implementation of the sdk.StringBuffer
+// interface. The underlying memory buffer is allocated and resized
+// automatically. The buffer allocation happens lazily at the first call
+// to Write. If during a call to Write the converted string is too large
+// to fit in the buffer, it gets resized automatically to a proper size.
 type StringBuffer struct {
 	cPtr *C.char
 	len  int

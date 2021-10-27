@@ -14,6 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This package exports the following C function:
+// - char* plugin_event_to_string(ss_plugin_t *s, const uint8_t *data, uint32_t datalen)
+//
+// The exported plugin_event_to_string requires that s to be a handle
+// of cgo.Handle from this SDK. The value of the s handle must implement
+// the sdk.Stringer and sdk.StringerBuffer interfaces.
+//
+// This function is part of the source_plugin_info interface as defined in
+// plugin_info.h. In almost all cases, your plugin should import this module,
+// unless your plugin exports those symbols by other means.
 package evtstr
 
 /*

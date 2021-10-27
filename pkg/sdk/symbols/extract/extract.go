@@ -14,6 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This package exports the following C function:
+// - ss_plugin_rc plugin_extract_fields(ss_plugin_t *s, const ss_plugin_event *evt, uint32_t num_fields, ss_plugin_extract_field *fields)
+//
+// The exported plugin_extract_fields requires s to be a handle
+// of cgo.Handle from this SDK. The value of the s handle must implement
+// the sdk.Extractor and sdk.ExtractRequests interfaces.
+//
+// This function is part of the source_plugin_info and extractor_plugin_info
+// interfaces as defined in plugin_info.h.
+// In almost all cases, your plugin should import this module, unless your
+// plugin exports those symbols by other means.
 package extract
 
 /*
@@ -39,7 +50,7 @@ func plugin_extract_fields_sync(plgState C.uintptr_t, evt *C.ss_plugin_event, nu
 	var i uint32
 	var extrReq sdk.ExtractRequest
 	for i = 0; i < numFields; i++ {
-		flds[i].field_present = false // is this necessary?
+		flds[i].field_present = false
 		extrReq = extrReqs.ExtractRequests().Get(int(flds[i].field_id))
 		extrReq.SetPtr(unsafe.Pointer(&flds[i]))
 

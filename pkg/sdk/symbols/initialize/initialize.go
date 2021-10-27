@@ -14,6 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This package exports the following C functions:
+// - ss_plugin_t* plugin_init(char* config, int32_t* rc)
+// - void* plugin_destroy(ss_plugin_t* s)
+//
+// The exported plugin_destroy requires s to be a handle
+// of cgo.Handle from this SDK. If the value of the s handle implements
+// the sdk.Destroyer interface, the function calls its Destroy method.
+// If any of sdk.ExtractRequests, sdk.LastErrorBuffer, sdk.StringerBuffer,
+// or sdk.ProgresserBuffer, are implemented, the function calls the Free method
+// on the returned sdk.StringBuffer. Finally, the function deletes the
+// s cgo.Handle.
+//
+// This function is part of the source_plugin_info and extractor_plugin_info
+// interfaces as defined in plugin_info.h.
+// In almost all cases, your plugin should import this module, unless your
+// plugin exports those symbols by other means.
 package initialize
 
 /*
@@ -43,12 +59,15 @@ func (b *baseInit) LastErrorBuffer() sdk.StringBuffer {
 	return &b.lastErrBuf
 }
 
+// OnInitFn is a callback used in plugin_init.
 type OnInitFn func(config string) (sdk.PluginState, error)
 
 var (
 	onInitFn OnInitFn = func(config string) (sdk.PluginState, error) { return &baseInit{}, nil }
 )
 
+// SetOnInit sets an initialization callback to be called in plugin_init to
+// create the plugin state. If never set, a default one is provided internally.
 func SetOnInit(fn OnInitFn) {
 	if fn == nil {
 		panic("plugin-sdk-go/sdk/symbols/initialize.SetOnInit: fn must not be nil")

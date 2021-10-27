@@ -46,7 +46,7 @@ func init() {
 	info.SetDescription("A Source Plugin Example")
 	info.SetContact("github.com/falcosecurity/plugin-sdk-go")
 	info.SetVersion("0.1.0")
-	info.SetRequiredAPIVersion("0.1.0")
+	info.SetRequiredAPIVersion("0.2.0")
 	info.SetType(sdk.TypeSourcePlugin)
 	info.SetEventSource("example")
 	initialize.SetOnInit(OnInit)
