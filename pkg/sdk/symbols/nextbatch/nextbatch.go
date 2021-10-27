@@ -37,13 +37,9 @@ func plugin_next_batch(pState C.uintptr_t, iState C.uintptr_t, nevts *uint32, re
 	if ok {
 		n, err = nextBatch.NextBatch(pHandle.Value().(sdk.PluginState), events)
 	} else {
-		next := iHandle.Value().(sdk.Nexter)
-		for n = 0; err == nil && n < events.Len(); n++ {
-			events.Get(n).SetTimestamp(C.UINT64_MAX)
-			err = next.Next(pHandle.Value().(sdk.PluginState), events.Get(n))
-		}
-		if n > 0 && (err == sdk.ErrEOF || err == sdk.ErrTimeout) {
-			err = nil
+		err = iHandle.Value().(sdk.Nexter).Next(pHandle.Value().(sdk.PluginState), events.Get(0))
+		if err == nil {
+			n = 1
 		}
 	}
 

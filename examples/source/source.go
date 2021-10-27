@@ -83,6 +83,11 @@ func (m *MyInstance) Next(pState sdk.PluginState, evt sdk.EventWriter) error {
 	return nil
 }
 
+// // (optional)
+// func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (int, error) {
+
+// }
+
 // // (optional: requires import _ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/progress)"
 // func (m *MyInstance) Progress(pState sdk.PluginState) (float64, string) {
 //

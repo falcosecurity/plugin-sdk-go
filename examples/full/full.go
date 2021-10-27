@@ -118,8 +118,18 @@ func (m *MyInstance) Next(pState sdk.PluginState, evt sdk.EventWriter) error {
 }
 
 // // (optional)
-// func (m *MyInstance) Close() {
-// 	println("Closed")
+// func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (int, error) {
+
+// }
+
+// // (optional: requires import _ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/progress)"
+// func (m *MyInstance) Progress(pState sdk.PluginState) (float64, string) {
+//
+// }
+
+// // (optional)
+// func (m *MyPluginInstance) Close() {
+//
 // }
 
 func main() {}
