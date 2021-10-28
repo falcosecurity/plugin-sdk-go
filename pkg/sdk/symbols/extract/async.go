@@ -28,6 +28,25 @@ import (
 
 var asyncWorkerRunning bool
 
+// StartAsync initializes and starts the asynchronous extraction mode.
+// Once StartAsync has been called, StopAsync must be called before terminating
+// the program. Multiple calls to StartAsync will cause a panic if StopAsync is
+// not called previously.
+//
+// This is a way to optimize field extraction for use cases in which the rate
+// of calls to plugin_extract_fields() is considerably high, so that the
+// overhead of the C -> Go calls may become unacceptable for performance.
+// Asynchronous extraction solves this problem by launching a worker
+// goroutine and by synchronizing with it through a spinlock.
+// The worker implements a busy wait, in order to ensure that the scheduler
+// sleeps it from its execution as less as possible. This is only suitable
+// for multi-core architectures, and has a significant impact on CPU usage,
+// so it should be carefully used only if the rate of C -> Go calls makes
+// the tradeoff worth it.
+//
+// After calling StartAsync, the framework automatically shift the extraction
+// strategy from the regular C -> Go call one to the alternative worker
+// synchronization one.
 func StartAsync(e sdk.Extractor) {
 	if asyncWorkerRunning {
 		panic("plugin-sdk-go/sdk/symbols/extract: async worker already started")
@@ -57,6 +76,8 @@ func StartAsync(e sdk.Extractor) {
 	}()
 }
 
+// StopAsync deinitializes and stops the asynchronous extraction mode, and
+// must be called after StartAsync.
 func StopAsync(e sdk.Extractor) {
 	C.destroy_async_extractor()
 	asyncWorkerRunning = false
