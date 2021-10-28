@@ -18,6 +18,12 @@ limitations under the License.
 // - ss_plugin_t* plugin_init(char* config, int32_t* rc)
 // - void* plugin_destroy(ss_plugin_t* s)
 //
+// The exported plugin_init calls the function set with SetOnInit, which
+// returns a sdk.PluginState interface. If the return value implements the
+// sdk.ExtractRequests interface, the function checks if an instance of
+// sdk.ExtractRequestPool has already been set. If not, a default
+// one is created on the fly and set with the SetExtractRequests method.
+//
 // The exported plugin_destroy requires s to be a handle
 // of cgo.Handle from this SDK. If the value of the s handle implements
 // the sdk.Destroyer interface, the function calls its Destroy method.

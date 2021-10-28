@@ -20,7 +20,11 @@ limitations under the License.
 //
 // The exported plugin_open requires s to be a handle
 // of cgo.Handle from this SDK. The value of the s handle must implement
-// the sdk.LastError interface.
+// the sdk.LastError interface. plugin_open calls the function set with
+// SetOnOpen, which returns a sdk.InstanceState interface. If the return
+// value implements the sdk.Events interface, the function checks if an
+// instance of sdk.EventWriters has already been set. If not, a default
+// one is created on the fly and set with the SetEvents method.
 //
 // The exported plugin_close requires h to be a handle
 // of cgo.Handle from this SDK. If the value of the h handle implements
