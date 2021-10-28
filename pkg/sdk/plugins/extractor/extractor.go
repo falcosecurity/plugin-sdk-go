@@ -14,11 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package extractor provides high-level constructs to easily build
+// extractor plugins.
 package extractor
 
 import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins"
+	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/extract"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/fields"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/info"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/initialize"
@@ -27,18 +30,31 @@ import (
 
 var registered = false
 
+// Plugin is an interface representing an extractor plugin.
 type Plugin interface {
 	plugins.Plugin
 	sdk.Extractor
+	sdk.ExtractRequests
+	//
+	// Fields return the list of extractor fields exported by this plugin.
 	Fields() []sdk.FieldEntry
 }
 
+// Register registers a Plugin extractor plugin in the framework. This function
+// needs to be called in a Go init() function. Calling this function more than
+// once will cause a panic.
+//
+// Register can also be called to register source plugins with optional
+// extraction capabilities. If this function is called before, or after, having
+// registered a source plugin in the SDK, the registered plugin will be a
+// plugin of type sdk.TypeSourcePlugin with extraction capabilities enabled.
 func Register(p Plugin) {
 	if registered {
 		panic("plugin-sdk-go/sdk/plugins/extractor: register can be called only once")
 	}
 
-	// currently TypeExtractorPlugin is also compatible with source plugins that export extract-related symbols
+	// Currently TypeExtractorPlugin is also compatible with source plugins
+	// that export extract-related symbols.
 	switch info.Type() {
 	case 0:
 		info.SetType(sdk.TypeExtractorPlugin)

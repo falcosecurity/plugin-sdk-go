@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package source provides high-level constructs to easily build
+// source plugins.
 package source
 
 import (
@@ -29,24 +31,70 @@ import (
 
 var registered = false
 
+// Plugin is an interface representing a source plugin.
 type Plugin interface {
 	plugins.Plugin
 	sdk.Stringer
+	sdk.StringerBuffer
+	//
+	// Open opens the source and starts a capture (e.g. stream of events).
+	//
+	// The argument string represents the user-defined parameters and
+	// can be used to customize how the source is opened.
+	// The return value is an Instance representing the source capture session.
+	// There can be multiple instances of the same source open.
+	// A successfull call to Open returns a nil error.
+	//
+	// The sdk.EventWriters event buffer, that is reused during each cycle
+	// of new event creation, is initialized in automatic after the execution
+	// of Open with the SetEvents method of the Instance interface.
+	// Developers may override the default sdk.EventWriters by setting it
+	// on the returned Instance with SetEvents, before returning from Open.
+	// This can help specifying the data event size, the size of each
+	// event batch, or just to use an implementation of the
+	// sdk.EventWriters interface different from the SDK default one.
 	Open(params string) (Instance, error)
 }
 
+// Instance is an interface representing a source capture session instance
+// returned by a call to Open of a source plugin.
+//
+// Implementations of this interface must implement sdk.Nexter or
+// sdk.NextBatcher, and can optionally implement sdk.Closer and
+// sdk.Progresser.
+// If sdk.Closer is implemented, the Close method will be called while closing
+// the source capture session.
+// If sdk.Progresser is implemented, the sdk/symbols/progress package will need
+// to be imported as following:
+// 	import _ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/progress
 type Instance interface {
-	sdk.Events
-	sdk.Nexter
 	// (optional) sdk.Closer
 	// (optional) sdk.NextBatcher
+	// (optional) sdk.Nexter
 	// (optional) sdk.Progresser
+	sdk.Events
+	sdk.ProgressBuffer
 }
 
+// BaseInstance is a base implementation of the Instance interface.
+// Developer-defined Instance implementations should be composed with BaseInstance
+// to have out-of-the-box compliance with all the required interfaces.
 type BaseInstance struct {
 	plugins.BaseEvents
+	plugins.BaseProgress
 }
 
+// Register registers a Plugin source plugin in the framework. This function
+// needs to be called in a Go init() function. Calling this function more than
+// once will cause a panic.
+//
+// Register registers a source plugin in the SDK. In order to
+// register a source plugin with optional extraction capabilities, the
+// extractor.Register function must be called by passing the same Plugin
+// argument. In this case, the order in which Register and extractor.Register
+// are called in the init() function is not relevant. This is needed for the
+// framework to notice that the source plugin implements the extraction-related
+// methods.
 func Register(p Plugin) {
 	if registered {
 		panic("plugin-sdk-go/sdk/plugins/source: register can be called only once")
