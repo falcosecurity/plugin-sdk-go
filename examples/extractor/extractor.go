@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This plugin is a simple example of extractor plugin.
+// The plugin extracts the "example.ts" field from the "example" event source,
+// which simply represents the timestamp of the extraction.
 package main
 
 import (
@@ -25,14 +28,29 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins/extractor"
 )
 
+// Defining a type for the plugin.
+// Composing the struct with plugins.BasePlugin is the recommended practice
+// as it provides the boilerplate code that satisfies most of the interface
+// requirements of the SDK.
+//
+// State variables to store in the plugin must be defined here.
+// In this simple example, we don't need any state.
 type MyPlugin struct {
 	plugins.BasePlugin
 }
 
+// The plugin must be registered to the SDK in the init() function.
+// The extractor.Register function initializes our plugin as an extractor
+// plugin. This requires our plugin to implement the extractor.Plugin
+// interface, so compilation will fail if the mandatory methods are not
+// implemented.
 func init() {
 	extractor.Register(&MyPlugin{})
 }
 
+// Info returns a pointer to a plugin.Info struct, containing all the
+// general information about this plugin.
+// This method is mandatory for extractor plugins.
 func (m *MyPlugin) Info() *plugins.Info {
 	return &plugins.Info{
 		ID:                  999,
@@ -45,16 +63,22 @@ func (m *MyPlugin) Info() *plugins.Info {
 	}
 }
 
+// Init initializes this plugin with a given config string, which is unused
+// in this example. This method is mandatory for extractor plugins.
 func (m *MyPlugin) Init(config string) error {
 	return nil
 }
 
+// Fields return the list of extractor fields exported by this plugin.
+// This method is mandatory for extractor plugins.
 func (m *MyPlugin) Fields() []sdk.FieldEntry {
 	return []sdk.FieldEntry{
-		{Type: "uint64", Name: "example.ts", Display: "", Desc: "The current timestamp"},
+		{Type: "uint64", Name: "example.ts", Display: "Current Timestamp", Desc: "The current timestamp"},
 	}
 }
 
+// Extract extracts the value of a single field from a given event data.
+// This method is mandatory for extractor plugins.
 func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 	switch req.FieldID() {
 	case 0:
@@ -65,9 +89,11 @@ func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 	}
 }
 
-// // (optional)
+// Destroy is gets called by the SDK when the plugin gets deinitialized.
+// This is useful to release any open resource used by the plugin.
+// This method is optional for extractor plugins.
 // func (m *MyPlugin) Destroy() {
-
+//
 // }
 
 func main() {}
