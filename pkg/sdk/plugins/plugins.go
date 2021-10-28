@@ -21,6 +21,7 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 )
 
+// Info is a struct containing the general information about a plugin.
 type Info struct {
 	ID                  uint32
 	Name                string
@@ -32,14 +33,25 @@ type Info struct {
 	ExtractEventSources []string
 }
 
+// Plugin is an interface representing a plugin.
+// Implementations of this interface can optionally implement the sdk.Destroy
+// interface to specify a Destroy method will be called during the
+// plugin deinitialization.
 type Plugin interface {
+	// (optional): sdk.Destroyer
 	sdk.LastError
 	sdk.LastErrorBuffer
+	//
+	// Info returns a pointer to a Info struct, containing
+	// all the general information about this plugin.
 	Info() *Info
+	//
+	// Init initializes this plugin with a given config string.
+	// A successful call to init returns a nil error.
 	Init(config string) error
-	// (optional): sdk.Destroyer
 }
 
+// BaseEvents is a base implementation of the sdk.Events interface.
 type BaseEvents struct {
 	events sdk.EventWriters
 }
@@ -52,6 +64,8 @@ func (b *BaseEvents) SetEvents(events sdk.EventWriters) {
 	b.events = events
 }
 
+// BaseExtractRequests is a base implementation of the sdk.ExtractRequests
+// interface.
 type BaseExtractRequests struct {
 	extrReqPool sdk.ExtractRequestPool
 }
@@ -64,6 +78,7 @@ func (b *BaseExtractRequests) SetExtractRequests(pool sdk.ExtractRequestPool) {
 	b.extrReqPool = pool
 }
 
+// BaseLastError is a base implementation of the sdk.LastError interface.
 type BaseLastError struct {
 	lastErr    error
 	lastErrBuf ptr.StringBuffer
@@ -81,6 +96,7 @@ func (b *BaseLastError) LastErrorBuffer() sdk.StringBuffer {
 	return &b.lastErrBuf
 }
 
+// BaseStringer is a base implementation of the sdk.StringerBuffer interface.
 type BaseStringer struct {
 	stringerBuf ptr.StringBuffer
 }
@@ -89,6 +105,7 @@ func (b *BaseStringer) StringerBuffer() sdk.StringBuffer {
 	return &b.stringerBuf
 }
 
+// BaseProgress is a base implementation of the sdk.ProgressBuffer interface.
 type BaseProgress struct {
 	progressBuf ptr.StringBuffer
 }
@@ -97,9 +114,11 @@ func (b *BaseProgress) ProgressBuffer() sdk.StringBuffer {
 	return &b.progressBuf
 }
 
+// BasePlugin is a base implementation of the Plugin interface.
+// Developer-defined Plugin implementations should be composed with BasePlugin
+// to have out-of-the-box compliance with all the required interfaces.
 type BasePlugin struct {
 	BaseLastError
 	BaseStringer
-	BaseProgress
 	BaseExtractRequests
 }

@@ -29,9 +29,9 @@ limitations under the License.
 // This SDK is designed to be layered with different levels of abstraction:
 //
 // 1. The "sdk/plugins" package provide high-level constructs to easily develop
-// Falco plugins in a Go-friendly way, by abstracting all the low-level details
+// plugins in a Go-friendly way, by abstracting all the low-level details
 // of the plugin framework and by avoiding the need of useless boilerplate code.
-// This package is the way to go for developers to start building Falco plugins.
+// This package is the way to go for developers to start building plugins.
 //
 // 2. The "sdk/symbols" package provide prebuilt implementations for all the C
 // symbols that need to be exported by the plugin in order to be accepted by the
