@@ -49,7 +49,7 @@ func nextCallback(pState unsafe.Pointer, iState unsafe.Pointer, evt EventWriter)
 }
 
 func BenchmarkEventWritersNext(b *testing.B) {
-	events, err := NewEventWriters(1, int64(MaxEvtSize))
+	events, err := NewEventWriters(1, int64(DefaultEvtSize))
 	if err != nil {
 		println(err.Error())
 		b.Fail()
@@ -69,7 +69,7 @@ func BenchmarkEventWritersNext(b *testing.B) {
 }
 
 func BenchmarkEventWritersNextBatch(b *testing.B) {
-	events, err := NewEventWriters(MaxNextBatchEvents, int64(MaxEvtSize))
+	events, err := NewEventWriters(DefaultBatchSize, int64(DefaultEvtSize))
 	if err != nil {
 		println(err.Error())
 		b.Fail()
@@ -88,7 +88,7 @@ func BenchmarkEventWritersNextBatch(b *testing.B) {
 }
 
 func TestEventWritersNextBatch(t *testing.T) {
-	events, err := NewEventWriters(MaxNextBatchEvents, int64(MaxEvtSize))
+	events, err := NewEventWriters(DefaultBatchSize, int64(DefaultEvtSize))
 	if err != nil {
 		println(err.Error())
 		t.Fail()
@@ -105,7 +105,7 @@ func TestEventWritersNextBatch(t *testing.T) {
 func TestEventWriterEventReader(t *testing.T) {
 	tmp := []byte{0}
 	evtNum := 1
-	evtSize := MaxEvtSize
+	evtSize := DefaultEvtSize
 
 	// Create event writer and write sample data
 	writers, err := NewEventWriters(int64(evtNum), int64(evtSize))

@@ -45,12 +45,13 @@ const (
 	TypeExtractorPlugin uint32 = 2
 )
 
-// The data payload allocated and returned in a call to plugin_next_batch()
-// should not be larger than this.
-const MaxEvtSize uint32 = 65535
+// DefaultEvtSize is the default size for the data payload allocated
+// for each event in the EventWriters interface used by the SDK.
+const DefaultEvtSize uint32 = 64 * 1024
 
-// The maximum number of events to return from a call to plugin_next_batch().
-const MaxNextBatchEvents = 512
+// DefaultBatchSize is the default number of events in the EventWriters
+// interface used by the SDK.
+const DefaultBatchSize = 512
 
 // The full set of values that someday might be returned in the ftype
 // member of ss_plugin_extract_field structs. For now, only
