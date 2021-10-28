@@ -57,7 +57,7 @@ type Stringer interface {
 
 // Extractor is an interface wrapping the basic Extract method.
 // Extract is meant to be used in plugin_extract_fields() to extract the value
-// of a single field from a a given event data.
+// of a single field from a given event data.
 type Extractor interface {
 	Extract(req ExtractRequest, evt EventReader) error
 }
