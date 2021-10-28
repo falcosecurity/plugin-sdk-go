@@ -23,7 +23,6 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins/extractor"
-	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/extract"
 )
 
 type MyPlugin struct {
@@ -47,13 +46,7 @@ func (m *MyPlugin) Info() *plugins.Info {
 }
 
 func (m *MyPlugin) Init(config string) error {
-	extract.StartAsync(m)
 	return nil
-}
-
-// (optional)
-func (m *MyPlugin) Destroy() {
-	extract.StopAsync(m)
 }
 
 func (m *MyPlugin) Fields() []sdk.FieldEntry {
@@ -63,13 +56,18 @@ func (m *MyPlugin) Fields() []sdk.FieldEntry {
 }
 
 func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
-	switch req.Field() {
-	case "example.ts":
+	switch req.FieldID() {
+	case 0:
 		req.SetU64Value(uint64(time.Now().UnixNano()))
 		return nil
 	default:
-		return fmt.Errorf("[extractor-example] unsupported field: %s", req.Field())
+		return fmt.Errorf("unsupported field: %s", req.Field())
 	}
 }
+
+// // (optional)
+// func (m *MyPlugin) Destroy() {
+
+// }
 
 func main() {}

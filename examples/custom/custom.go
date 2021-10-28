@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"time"
@@ -24,20 +25,24 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins"
 	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/evtstr"
-	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/extract"
+	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/extract"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/fields"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/info"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/initialize"
+	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/lasterr"
 	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/nextbatch"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/open"
 )
 
 type MyPlugin struct {
 	plugins.BaseLastError
+	plugins.BaseExtractRequests
+	plugins.BaseStringer
 }
 
 type MyInstance struct {
 	plugins.BaseEvents
+	plugins.BaseProgress
 }
 
 func init() {
@@ -49,26 +54,21 @@ func init() {
 	info.SetRequiredAPIVersion("0.2.0")
 	info.SetType(sdk.TypeSourcePlugin)
 	info.SetEventSource("example")
+
 	initialize.SetOnInit(OnInit)
 	open.SetOnOpen(OnOpen)
+
 	fields.SetFields([]sdk.FieldEntry{
 		{Type: "string", Name: "example.hello", Display: "Hello World", Desc: "An hello world string"},
 	})
 }
 
 func OnInit(config string) (sdk.PluginState, error) {
-	s := &MyPlugin{}
-	extract.StartAsync(s)
-	return s, nil
+	return &MyPlugin{}, nil
 }
 
 func OnOpen(params string) (sdk.InstanceState, error) {
 	return &MyInstance{}, nil
-}
-
-// (optional)
-func (p *MyPlugin) Destroy() {
-	extract.StopAsync(p)
 }
 
 func (i *MyPlugin) String(in io.ReadSeeker) (string, error) {
@@ -94,21 +94,28 @@ func (p *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 		return err
 	}
 
-	switch req.Field() {
-	case "example.hello":
+	switch req.FieldID() {
+	case 0:
 		req.SetStrValue(string(bytes))
+	default:
+		return fmt.Errorf("unsupported field: %s", req.Field())
 	}
 
 	return nil
 }
 
-// // (optional: a default implementations is provided)
+// // (optional)
 // func (i *instanceState) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) error {
 //
 // }
 
 // // (optional)
 // func (p *instanceState) Close() {
+//
+// }
+
+// // (optional)
+// func (p *MyPlugin) Destroy() {
 //
 // }
 

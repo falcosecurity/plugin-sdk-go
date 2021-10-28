@@ -1,4 +1,4 @@
-module github.com/falcosecurity/plugin-sdk-go/examples/aplugin
+module github.com/falcosecurity/plugin-sdk-go/examples/full
 
 replace github.com/falcosecurity/plugin-sdk-go => ../../
 
