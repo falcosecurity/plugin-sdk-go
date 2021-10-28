@@ -121,10 +121,10 @@ type eventWriters struct {
 // of events contained. Then dataSize argument indicates the maximum data
 // size of each event.
 func NewEventWriters(size, dataSize int64) (EventWriters, error) {
-	if size < 1 || size > MaxNextBatchEvents {
+	if size < 1 {
 		return nil, fmt.Errorf("invalid size: %d", size)
 	}
-	if dataSize < 0 || dataSize > int64(MaxEvtSize) {
+	if dataSize < 0 || dataSize > C.UINT32_MAX {
 		return nil, fmt.Errorf("invalid dataSize: %d", dataSize)
 	}
 

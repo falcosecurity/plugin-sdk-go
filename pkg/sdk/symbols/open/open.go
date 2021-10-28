@@ -72,7 +72,7 @@ func plugin_open(plgState C.uintptr_t, params *C.char, rc *int32) C.uintptr_t {
 		iEvents, ok := iState.(sdk.Events)
 		if ok && iEvents.Events() == nil {
 			var events sdk.EventWriters
-			events, err = sdk.NewEventWriters(int64(sdk.MaxNextBatchEvents), int64(sdk.MaxEvtSize))
+			events, err = sdk.NewEventWriters(int64(sdk.DefaultBatchSize), int64(sdk.DefaultEvtSize))
 			if err == nil {
 				iEvents.SetEvents(events)
 			}
