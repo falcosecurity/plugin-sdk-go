@@ -64,7 +64,7 @@ func (m *MyPlugin) String(in io.ReadSeeker) (string, error) {
 	if err := encoder.Decode(&value); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("[source-example] counter: %d", value), nil
+	return fmt.Sprintf("counter: %d", value), nil
 }
 
 func (m *MyPlugin) Open(params string) (source.Instance, error) {
@@ -94,7 +94,12 @@ func (m *MyInstance) Next(pState sdk.PluginState, evt sdk.EventWriter) error {
 // }
 
 // // (optional)
-// func (m *MyPluginInstance) Close() {
+// func (m *MyInstance) Close() {
+//
+// }
+
+// // (optional)
+// func (m *MyPlugin) Destroy() {
 //
 // }
 

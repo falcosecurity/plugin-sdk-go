@@ -26,7 +26,6 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins/extractor"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins/source"
-	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/extract"
 )
 
 type MyPlugin struct {
@@ -57,13 +56,7 @@ func (m *MyPlugin) Info() *plugins.Info {
 }
 
 func (m *MyPlugin) Init(config string) error {
-	extract.StartAsync(m)
 	return nil
-}
-
-// (optional)
-func (m *MyPlugin) Destroy() {
-	extract.StopAsync(m)
 }
 
 func (m *MyPlugin) Fields() []sdk.FieldEntry {
@@ -73,15 +66,6 @@ func (m *MyPlugin) Fields() []sdk.FieldEntry {
 	}
 }
 
-func (m *MyPlugin) String(in io.ReadSeeker) (string, error) {
-	var value uint64
-	encoder := gob.NewDecoder(in)
-	if err := encoder.Decode(&value); err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("[full-example] counter: %d", value), nil
-}
-
 func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 	var value uint64
 	encoder := gob.NewDecoder(evt.Reader())
@@ -89,15 +73,15 @@ func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 		return err
 	}
 
-	switch req.Field() {
-	case "example.count":
+	switch req.FieldID() {
+	case 0:
 		req.SetU64Value(value)
 		return nil
-	case "example.countstr":
+	case 1:
 		req.SetStrValue(fmt.Sprintf("%d", value))
 		return nil
 	default:
-		return fmt.Errorf("[full-example] unsupported field: %s", req.Field())
+		return fmt.Errorf("unsupported field: %s", req.Field())
 	}
 }
 
@@ -105,6 +89,15 @@ func (m *MyPlugin) Open(params string) (source.Instance, error) {
 	return &MyInstance{
 		counter: 0,
 	}, nil
+}
+
+func (m *MyPlugin) String(in io.ReadSeeker) (string, error) {
+	var value uint64
+	encoder := gob.NewDecoder(in)
+	if err := encoder.Decode(&value); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("counter: %d", value), nil
 }
 
 func (m *MyInstance) Next(pState sdk.PluginState, evt sdk.EventWriter) error {
@@ -119,7 +112,7 @@ func (m *MyInstance) Next(pState sdk.PluginState, evt sdk.EventWriter) error {
 
 // // (optional)
 // func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (int, error) {
-
+//
 // }
 
 // // (optional: requires import _ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/progress)"
@@ -128,7 +121,12 @@ func (m *MyInstance) Next(pState sdk.PluginState, evt sdk.EventWriter) error {
 // }
 
 // // (optional)
-// func (m *MyPluginInstance) Close() {
+// func (m *MyInstance) Close() {
+//
+// }
+
+// // (optional)
+// func (m *MyPlugin) Destroy() {
 //
 // }
 
