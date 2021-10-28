@@ -14,8 +14,9 @@ SHELL := /bin/bash
 GO ?= $(shell which go)
 CURL = curl
 
-FALCOSECURITY_LIBS_REVISION ?= master
+FALCOSECURITY_LIBS_REVISION ?= b9d2fccebf0feb94729c78bee0368c70d9c24819
 FALCOSECURITY_LIBS_REPO ?= falcosecurity/libs
+
 PLUGIN_INFO_DIR=pkg/sdk
 PLUGIN_INFO_URL=https://raw.githubusercontent.com/${FALCOSECURITY_LIBS_REPO}/${FALCOSECURITY_LIBS_REVISION}/userspace/libscap/plugin_info.h
 
