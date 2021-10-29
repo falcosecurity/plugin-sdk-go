@@ -20,8 +20,7 @@ limitations under the License.
 // The exported plugin_next_batch requires s and h to be a handles
 // of cgo.Handle from this SDK. The value of the s handle must implement
 // the sdk.PluginState interface. The value of the h handle must implement
-// the sdk.Events interface and either sdk.Nexter or sdk.NextBatcher. If
-// sdk.NextBatcher is implemented, then the sdk.Nexter interface is ignored.
+// the sdk.Events and the sdk.NextBatcher interfaces.
 //
 // This function is part of the source_plugin_info interface as defined in
 // plugin_info.h.
@@ -40,21 +39,8 @@ import (
 
 //export plugin_next_batch
 func plugin_next_batch(pState C.uintptr_t, iState C.uintptr_t, nevts *uint32, retEvts **C.ss_plugin_event) int32 {
-	iHandle := cgo.Handle(iState)
-	pHandle := cgo.Handle(pState)
-	events := iHandle.Value().(sdk.Events).Events()
-	var err error
-	var n int
-
-	nextBatch, ok := iHandle.Value().(sdk.NextBatcher)
-	if ok {
-		n, err = nextBatch.NextBatch(pHandle.Value().(sdk.PluginState), events)
-	} else {
-		err = iHandle.Value().(sdk.Nexter).Next(pHandle.Value().(sdk.PluginState), events.Get(0))
-		if err == nil {
-			n = 1
-		}
-	}
+	events := cgo.Handle(iState).Value().(sdk.Events).Events()
+	n, err := cgo.Handle(iState).Value().(sdk.NextBatcher).NextBatch(cgo.Handle(pState).Value().(sdk.PluginState), events)
 
 	*nevts = uint32(n)
 	*retEvts = (*C.ss_plugin_event)(events.ArrayPtr())

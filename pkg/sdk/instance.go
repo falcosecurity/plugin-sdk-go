@@ -41,28 +41,6 @@ type Events interface {
 	SetEvents(events EventWriters)
 }
 
-// Nexter is an interface wrapping the basic Next method.
-// Next is meant to be used in plugin_next_batch() to create a single
-// new event.
-//
-// The pState argument represents the plugin state, whereas the evt argument
-// is an EventWriter representing the to-be created event.
-//
-// Next can set a timestamp for the to-be created event with the SetTimestamp
-// method of the EventWriter interface. If not set manually, the framework will
-// set a timestamp automatically. Next must be consistent in setting
-// timestamps: either it sets it for every event, or for none.
-//
-// A successful call to Next returns a nil error. If an error is returned,
-// the event is discarded. ErrTimeout can be returned to indicate that no
-// new events are currently available, but that they can be available in
-// future calls to Next. ErrEOF can be returned to indicate that no new
-// events will be available. After returning ErrEOF once, subsequent calls
-// to Next must be idempotent and must keep returning ErrEOF.
-type Nexter interface {
-	Next(pState PluginState, evt EventWriter) error
-}
-
 // NextBatcher is an interface wrapping the basic NextBatch method.
 // NextBatch is meant to be used in plugin_next_batch() to create a batch of
 // new events altogether.

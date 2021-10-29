@@ -59,9 +59,8 @@ type Plugin interface {
 // Instance is an interface representing a source capture session instance
 // returned by a call to Open of a source plugin.
 //
-// Implementations of this interface must implement sdk.Nexter or
-// sdk.NextBatcher, and can optionally implement sdk.Closer and
-// sdk.Progresser.
+// Implementations of this interface must implement sdk.NextBatcher, and can
+// optionally implement sdk.Closer and sdk.Progresser.
 // If sdk.Closer is implemented, the Close method will be called while closing
 // the source capture session.
 // If sdk.Progresser is implemented, the sdk/symbols/progress package will need
@@ -69,10 +68,9 @@ type Plugin interface {
 // 	import _ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/progress
 type Instance interface {
 	// (optional) sdk.Closer
-	// (optional) sdk.NextBatcher
-	// (optional) sdk.Nexter
 	// (optional) sdk.Progresser
 	sdk.Events
+	sdk.NextBatcher
 	sdk.ProgressBuffer
 }
 

@@ -164,9 +164,7 @@ func (m *MyPlugin) String(in io.ReadSeeker) (string, error) {
 }
 
 // NextBatch produces a batch of new events, and is called repeatedly by the
-// framework. For source plugins, it's mandatory to specify either a Next or a
-// NextBatch method. If both are specified, the SDK will ignore the Next method
-// and will only produce new events with NextBatch.
+// framework. For source plugins, it's mandatory to specify a NextBatch method.
 // The batch has a maximum size that dependes on the size of the underlying
 // reusable memory buffer. A batch can be smaller than the maximum size.
 func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (int, error) {
@@ -183,14 +181,6 @@ func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (i
 	}
 	return n, nil
 }
-
-// Next produces a single new event, and is called repeatedly by the framework.
-// For source plugins, it's mandatory to specify either a Next or a NextBatch
-// method. If both are specified, the SDK will ignore the Next method and will
-// only produce new events with NextBatch.
-// func (m *MyInstance) Next(pState sdk.PluginState, evt sdk.EventWriter) error {
-//
-// }
 
 // Progress returns a percentage indicator referring to the production progress
 // of the event source of this plugin.
