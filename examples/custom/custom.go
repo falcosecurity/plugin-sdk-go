@@ -165,19 +165,6 @@ func plugin_event_to_string(pState C.uintptr_t, data *C.uint8_t, datalen uint32)
 	return (*C.char)(buffer.CharPtr())
 }
 
-// Next produces a single new event, and is called repeatedly by the framework.
-// For source plugins, it's mandatory to specify either a Next or a NextBatch
-// method. If both are specified, the prebuilt plugin_next_batch C symbol will
-// ignore the Next method and will only produce new events with NextBatch.
-func (i *MyInstance) Next(pState sdk.PluginState, evt sdk.EventWriter) error {
-	writer := evt.Writer()
-	if _, err := writer.Write([]byte("hello world")); err != nil {
-		return err
-	}
-	evt.SetTimestamp(uint64(time.Now().UnixNano()))
-	return nil
-}
-
 // This method is optional for source plugins, and enables the extraction
 // capabilities. This is required and called by the prebuilt
 // plugin_extract_fields C symbol.
@@ -198,14 +185,19 @@ func (p *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 }
 
 // NextBatch produces a batch of new events, and is called repeatedly by the
-// framework. For source plugins, it's mandatory to specify either a Next or a
-// NextBatch method. If both are specified, the prebuilt plugin_next_batch C symbol will
-// ignore the Next method and will only produce new events with NextBatch.
-// The batch has a maximum size that dependes on the size of the underlying
-// reusable memory buffer. A batch can be smaller than the maximum size.
-// func (i *instanceState) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) error {
-//
-// }
+// framework. For the prebuilt plugin_next_batch symbol, it's mandatory to
+// specify a NextBatch method. The batch has a maximum size that dependes on
+// the size of the underlying reusable memory buffer.
+// A batch can be smaller than the maximum size.
+func (i *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (int, error) {
+	evt := evts.Get(0)
+	writer := evt.Writer()
+	if _, err := writer.Write([]byte("hello world")); err != nil {
+		return 0, err
+	}
+	evt.SetTimestamp(uint64(time.Now().UnixNano()))
+	return 1, nil
+}
 
 // Progress returns a percentage indicator referring to the production progress
 // of the event source of this plugin. The Progress method is required if using
@@ -219,7 +211,7 @@ func (p *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 // Close is gets called by the prebuilt plugin_close C symbol when the plugin
 // source capture gets closed. This is useful to release any open resource used
 // by each plugin instance.
-// func (p *instanceState) Close() {
+// func (p *MyInstance) Close() {
 //
 // }
 

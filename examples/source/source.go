@@ -110,29 +110,21 @@ func (m *MyPlugin) String(in io.ReadSeeker) (string, error) {
 	return fmt.Sprintf("counter: %d", value), nil
 }
 
-// Next produces a single new event, and is called repeatedly by the framework.
-// For source plugins, it's mandatory to specify either a Next or a NextBatch
-// method. If both are specified, the SDK will ignore the Next method and will
-// only produce new events with NextBatch.
-func (m *MyInstance) Next(pState sdk.PluginState, evt sdk.EventWriter) error {
+// NextBatch produces a batch of new events, and is called repeatedly by the
+// framework. For source plugins, it's mandatory to specify a NextBatch method.
+// The batch has a maximum size that dependes on the size of the underlying
+// reusable memory buffer. A batch can be smaller than the maximum size.
+func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (int, error) {
+	// We ignore the batching feature here, and just produce one event per time
+	evt := evts.Get(0)
 	m.counter++
 	encoder := gob.NewEncoder(evt.Writer())
 	if err := encoder.Encode(m.counter); err != nil {
-		return err
+		return 0, err
 	}
 	evt.SetTimestamp(uint64(time.Now().UnixNano()))
-	return nil
+	return 1, nil
 }
-
-// NextBatch produces a batch of new events, and is called repeatedly by the
-// framework. For source plugins, it's mandatory to specify either a Next or a
-// NextBatch method. If both are specified, the SDK will ignore the Next method
-// and will only produce new events with NextBatch.
-// The batch has a maximum size that dependes on the size of the underlying
-// reusable memory buffer. A batch can be smaller than the maximum size.
-// func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (int, error) {
-
-// }
 
 // Progress returns a percentage indicator referring to the production progress
 // of the event source of this plugin.
