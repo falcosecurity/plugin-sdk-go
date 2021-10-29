@@ -29,4 +29,11 @@ limitations under the License.
 // and developers are instead encouraged to rely on the plugins package to
 // build their plugins.
 //
+// Most of the time, a plugin author only needs to import the following packages,
+// which provide the "default" streamlined interfaces to implementing a source
+// or extractor plugin:
+//  "github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
+//  "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins"
+//  "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins/{source,extractor}"
+//
 package plugins
