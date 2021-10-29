@@ -25,6 +25,12 @@ limitations under the License.
 // (https://falco.org/docs/plugins/developers_guide/#example-go-plugin-dummy)
 // of a plugin written in Go that uses this package.
 //
+// For a quick start, you can refer to the provided examples of extractor plugin
+// (https://github.com/falcosecurity/plugin-sdk-go/tree/main/examples/extractor),
+// source plugin
+// (https://github.com/falcosecurity/plugin-sdk-go/tree/main/examples/source),
+// and source plugin with extraction
+// (https://github.com/falcosecurity/plugin-sdk-go/tree/main/examples/full).
 //
 // This SDK is designed to be layered with different levels of abstraction:
 //
@@ -46,4 +52,5 @@ limitations under the License.
 // 3. The "sdk" package provides basic definitions and constructs necessary to develop
 // plugins. The SDK describes the behavior of plugins as a set of minimal and
 // composable interfaces, to be used flexibly in other packages.
+//
 package sdk
