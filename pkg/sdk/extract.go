@@ -47,13 +47,8 @@ type ExtractRequest interface {
 	// is returned if no argument is specified.
 	Arg() string
 	//
-	// SetStrValue sets the extracted value for the requested field.
-	// This must be used for fields of string value type only.
-	SetStrValue(v string)
-	//
-	// SetU64Value sets the extracted value for the requested field.
-	// This must be used for fields of u64 value type only.
-	SetU64Value(v uint64)
+	// SetValue sets the extracted value for the requested field.
+	SetValue(v interface{})
 	//
 	// SetPtr sets a pointer to a ss_plugin_extract_field C structure to
 	// be wrapped in this instance of ExtractRequest.
@@ -128,13 +123,13 @@ func (e *extractRequest) Arg() string {
 	return ptr.GoString(unsafe.Pointer(e.req.arg))
 }
 
-func (e *extractRequest) SetStrValue(v string) {
-	e.strBuf.Write(v)
-	e.req.res_str = (*C.char)(e.strBuf.CharPtr())
-	e.req.field_present = true
-}
-
-func (e *extractRequest) SetU64Value(v uint64) {
-	e.req.res_u64 = (C.ulong)(v)
+func (e *extractRequest) SetValue(v interface{}) {
+	switch e.FieldType() {
+	case ParamTypeUint64:
+		e.req.res_u64 = (C.ulong)(v.(uint64))
+	case ParamTypeCharBuf:
+		e.strBuf.Write(v.(string))
+		e.req.res_str = (*C.char)(e.strBuf.CharPtr())
+	}
 	e.req.field_present = true
 }
