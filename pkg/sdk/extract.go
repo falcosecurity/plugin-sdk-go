@@ -48,6 +48,10 @@ type ExtractRequest interface {
 	Arg() string
 	//
 	// SetValue sets the extracted value for the requested field.
+	//
+	// The underlying type of v must be compatible with the field type
+	// associated to this extract request (as the returned by FieldType()),
+	// otherwise SetValue will panic.
 	SetValue(v interface{})
 	//
 	// SetPtr sets a pointer to a ss_plugin_extract_field C structure to
@@ -130,6 +134,8 @@ func (e *extractRequest) SetValue(v interface{}) {
 	case ParamTypeCharBuf:
 		e.strBuf.Write(v.(string))
 		e.req.res_str = (*C.char)(e.strBuf.CharPtr())
+	default:
+		panic("plugin-sdk-go/sdk: called SetValue with unsupported field type")
 	}
 	e.req.field_present = true
 }
