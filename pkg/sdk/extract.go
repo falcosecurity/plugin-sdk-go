@@ -34,6 +34,11 @@ type ExtractRequest interface {
 	// returned by plugin_get_fields
 	FieldID() uint64
 	//
+	// FieldType returns the type of the field for which the value extraction
+	// is requested. For now, only sdk.ParamTypeUint64 and
+	// sdk.ParamTypeCharBuf are supported.
+	FieldType() uint32
+	//
 	// Field returns the name of the field for which the value extraction
 	// is requested.
 	Field() string
@@ -109,6 +114,10 @@ func (e *extractRequest) SetPtr(pef unsafe.Pointer) {
 
 func (e *extractRequest) FieldID() uint64 {
 	return uint64(e.req.field_id)
+}
+
+func (e *extractRequest) FieldType() uint32 {
+	return uint32(e.req.ftype)
 }
 
 func (e *extractRequest) Field() string {
