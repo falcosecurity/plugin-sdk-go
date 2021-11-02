@@ -82,7 +82,7 @@ func (m *MyPlugin) Fields() []sdk.FieldEntry {
 func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 	switch req.FieldID() {
 	case 0:
-		req.SetU64Value(uint64(time.Now().UnixNano()))
+		req.SetValue(uint64(time.Now().UnixNano()))
 		return nil
 	default:
 		return fmt.Errorf("unsupported field: %s", req.Field())

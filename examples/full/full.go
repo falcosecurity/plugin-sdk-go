@@ -119,10 +119,10 @@ func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 
 	switch req.FieldID() {
 	case 0:
-		req.SetU64Value(value)
+		req.SetValue(value)
 		return nil
 	case 1:
-		req.SetStrValue(fmt.Sprintf("%d", value))
+		req.SetValue(fmt.Sprintf("%d", value))
 		return nil
 	default:
 		return fmt.Errorf("unsupported field: %s", req.Field())
