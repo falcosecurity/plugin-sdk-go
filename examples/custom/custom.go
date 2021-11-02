@@ -176,7 +176,7 @@ func (p *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 
 	switch req.FieldID() {
 	case 0:
-		req.SetStrValue(string(bytes))
+		req.SetValue(string(bytes))
 	default:
 		return fmt.Errorf("unsupported field: %s", req.Field())
 	}
