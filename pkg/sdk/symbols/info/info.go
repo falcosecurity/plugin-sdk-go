@@ -141,5 +141,4 @@ func SetExtractEventSources(sources []string) {
 	} else {
 		pExtractEventSources.Write(string(b))
 	}
-
 }

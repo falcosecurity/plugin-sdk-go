@@ -49,3 +49,39 @@ func TestGoStringPointer(t *testing.T) {
 		t.Errorf("str=%s, len=%d", str, len(str))
 	}
 }
+
+func TestGoStringNull(t *testing.T) {
+	str := GoString(nil)
+	if len(str) > 0 {
+		t.Errorf("expected empty string")
+	}
+}
+
+func TestStringBuffer(t *testing.T) {
+	str := "hello"
+	buf := &StringBuffer{}
+
+	if buf.CharPtr() != nil {
+		t.Errorf("expected nil char pointer")
+	}
+	if len(buf.String()) > 0 {
+		t.Errorf("expected empty string")
+	}
+
+	buf.Write(str)
+	if buf.CharPtr() == nil {
+		t.Errorf("expected non-nil char pointer")
+	}
+	if buf.String() != str {
+		t.Errorf("string does not match: %s expected, but %s found", str, buf.String())
+	}
+
+	// test reallocation
+	str = str + " world"
+	buf.Write(str)
+	if buf.String() != str {
+		t.Errorf("string does not match: %s expected, but %s found", str, buf.String())
+	}
+
+	buf.Free()
+}

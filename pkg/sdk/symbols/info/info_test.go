@@ -15,3 +15,100 @@ limitations under the License.
 */
 
 package info
+
+import (
+	"encoding/json"
+	"testing"
+	"unsafe"
+
+	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
+)
+
+var testStr = "test"
+var testU32 = uint32(1)
+var testStrSlice = []string{"hello", "world"}
+
+func TestInfo(t *testing.T) {
+	var resU32 uint32
+	var resStr string
+	var expectedStr string
+
+	SetId(testU32)
+	resU32 = plugin_get_id()
+	if resU32 != testU32 {
+		t.Errorf("(id) expected %d, but found %d", testU32, resU32)
+	}
+
+	SetType(testU32)
+	resU32 = plugin_get_type()
+	if resU32 != testU32 {
+		t.Errorf("(type) expected %d, but found %d", testU32, resU32)
+	}
+	resU32 = Type()
+	if resU32 != testU32 {
+		t.Errorf("(type) expected %d, but found %d", testU32, resU32)
+	}
+
+	SetName(testStr)
+	resStr = ptr.GoString(unsafe.Pointer(plugin_get_name()))
+	if resStr != testStr {
+		t.Errorf("(name) expected %s, but found %s", testStr, resStr)
+	}
+
+	SetDescription(testStr)
+	resStr = ptr.GoString(unsafe.Pointer(plugin_get_description()))
+	if resStr != testStr {
+		t.Errorf("(description) expected %s, but found %s", testStr, resStr)
+	}
+
+	SetContact(testStr)
+	resStr = ptr.GoString(unsafe.Pointer(plugin_get_contact()))
+	if resStr != testStr {
+		t.Errorf("(contact) expected %s, but found %s", testStr, resStr)
+	}
+
+	SetVersion(testStr)
+	resStr = ptr.GoString(unsafe.Pointer(plugin_get_version()))
+	if resStr != testStr {
+		t.Errorf("(version) expected %s, but found %s", testStr, resStr)
+	}
+
+	SetRequiredAPIVersion(testStr)
+	resStr = ptr.GoString(unsafe.Pointer(plugin_get_required_api_version()))
+	if resStr != testStr {
+		t.Errorf("(requiredApiVersion) expected %s, but found %s", testStr, resStr)
+	}
+
+	SetEventSource(testStr)
+	resStr = ptr.GoString(unsafe.Pointer(plugin_get_event_source()))
+	if resStr != testStr {
+		t.Errorf("(eventSource) expected %s, but found %s", testStr, resStr)
+	}
+
+	// extractEventSources: nil
+	expectedStr = "[]"
+	resStr = ptr.GoString(unsafe.Pointer(plugin_get_extract_event_sources()))
+	if resStr != expectedStr {
+		t.Errorf("(extractEventSources) expected %s, but found %s", testStr, resStr)
+	}
+
+	// extractEventSources: regular case (should output a json)
+	b, err := json.Marshal(testStrSlice)
+	if err != nil {
+		t.Error(err)
+	}
+	expectedStr = string(b)
+	SetExtractEventSources(testStrSlice)
+	resStr = ptr.GoString(unsafe.Pointer(plugin_get_extract_event_sources()))
+	if resStr != expectedStr {
+		t.Errorf("(extractEventSources) expected %s, but found %s", testStr, resStr)
+	}
+
+	// extractEventSources: empty string
+	expectedStr = "[]"
+	SetExtractEventSources([]string{})
+	resStr = ptr.GoString(unsafe.Pointer(plugin_get_extract_event_sources()))
+	if resStr != expectedStr {
+		t.Errorf("(extractEventSources) expected %s, but found %s", testStr, resStr)
+	}
+}

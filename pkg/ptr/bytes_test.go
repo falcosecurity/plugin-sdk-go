@@ -107,6 +107,65 @@ func TestBytesReadWriterPointer(t *testing.T) {
 	}
 }
 
+func TestBytesReadWriterSeek(t *testing.T) {
+	// Allocate a memory buffer and wrap it in a BytesReadWriter
+	_, bytesReadWriter, err := createAndWrapBytes(128, byte(10))
+	if err != nil {
+		t.Error(err)
+	}
+
+	pos, err := bytesReadWriter.Seek(5, io.SeekStart)
+	if err != nil {
+		t.Error(err)
+	} else if pos != 5 {
+		t.Errorf("wrong seek result (SeekStart): expected %d, but found %d", 5, pos)
+	}
+
+	pos, err = bytesReadWriter.Seek(10, io.SeekCurrent)
+	if err != nil {
+		t.Error(err)
+	} else if pos != 15 {
+		t.Errorf("wrong seek result (SeekCurrent): expected %d, but found %d", 15, pos)
+	}
+
+	pos, err = bytesReadWriter.Seek(0, io.SeekEnd)
+	if err != nil {
+		t.Error(err)
+	} else if pos != 128 {
+		t.Errorf("wrong seek result (SeekEnd): expected %d, but found %d", 128, pos)
+	}
+
+	// Wrong whence
+	_, err = bytesReadWriter.Seek(0, io.SeekEnd+1)
+	if err == nil {
+		t.Errorf("err should not be nil")
+	}
+
+	// Negative offset
+	_, err = bytesReadWriter.Seek(-1, io.SeekStart)
+	if err == nil {
+		t.Errorf("err should not be nil")
+	}
+
+	// Going beyond the buffer len (SeekCurrent)
+	_, err = bytesReadWriter.Seek(1, io.SeekCurrent)
+	if err == nil {
+		t.Errorf("err should not be nil")
+	}
+
+	// Going beyond the buffer len (SeekEnd)
+	_, err = bytesReadWriter.Seek(129, io.SeekEnd)
+	if err == nil {
+		t.Errorf("err should not be nil")
+	}
+
+	// Going beyond the buffer len (SeekStart)
+	_, err = bytesReadWriter.Seek(129, io.SeekStart)
+	if err == nil {
+		t.Errorf("err should not be nil")
+	}
+}
+
 func TestBytesReadWriterReadAll(t *testing.T) {
 	// Allocate a memory buffer and wrap it in a BytesReadWriter
 	bytesFillValue := byte(10)
