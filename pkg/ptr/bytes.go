@@ -181,7 +181,6 @@ func (b *bytesReadWriter) Seek(offset int64, whence int) (int64, error) {
 	default:
 		return b.offset, fmt.Errorf(whenceErrorFmt, whence)
 	}
-	b.offset = offset
 	return b.offset, nil
 }
 
