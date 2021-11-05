@@ -49,7 +49,7 @@ func nextCallback(pState unsafe.Pointer, iState unsafe.Pointer, evt EventWriter)
 }
 
 func BenchmarkEventWritersNext(b *testing.B) {
-	events, err := NewEventWriters(1, int64(DefaultEvtSize))
+	writers, err := NewEventWriters(1, int64(DefaultEvtSize))
 	if err != nil {
 		println(err.Error())
 		b.Fail()
@@ -57,7 +57,7 @@ func BenchmarkEventWritersNext(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		event := events.Get(0)
+		event := writers.Get(0)
 		encoder := json.NewEncoder(event.Writer())
 		err = encoder.Encode(sample)
 		if err != nil {
@@ -69,7 +69,7 @@ func BenchmarkEventWritersNext(b *testing.B) {
 }
 
 func BenchmarkEventWritersNextBatch(b *testing.B) {
-	events, err := NewEventWriters(DefaultBatchSize, int64(DefaultEvtSize))
+	writers, err := NewEventWriters(DefaultBatchSize, int64(DefaultEvtSize))
 	if err != nil {
 		println(err.Error())
 		b.Fail()
@@ -77,8 +77,8 @@ func BenchmarkEventWritersNextBatch(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		for j := 0; j < events.Len(); j++ {
-			err := nextCallback(nil, nil, events.Get(j))
+		for j := 0; j < writers.Len(); j++ {
+			err := nextCallback(nil, nil, writers.Get(j))
 			if err != nil {
 				println(err.Error())
 				b.Fail()
@@ -106,13 +106,15 @@ func TestEventWriterEventReader(t *testing.T) {
 	tmp := []byte{0}
 	evtNum := 1
 	evtSize := DefaultEvtSize
+	timestamp := time.Now()
 
 	// Create event writer and write sample data
 	writers, err := NewEventWriters(int64(evtNum), int64(evtSize))
 	if err != nil {
 		t.Error(err)
 	}
-	writer := writers.Get(0).Writer()
+	evtWriter := writers.Get(0)
+	writer := evtWriter.Writer()
 	for i := 0; i < int(evtSize); i++ {
 		n, err := writer.Write(tmp)
 		if err != nil {
@@ -121,9 +123,15 @@ func TestEventWriterEventReader(t *testing.T) {
 			t.Errorf("Failed writing byte #%d in event", i)
 		}
 	}
+	evtWriter.SetTimestamp(uint64(timestamp.UnixNano()))
 
 	// Create event reader and read all data
-	reader := NewEventReader(writers.ArrayPtr()).Reader()
+	evtReader := NewEventReader(writers.ArrayPtr())
+	reader := evtReader.Reader()
+	_ = evtReader.EventNum()
+	if evtReader.Timestamp() != uint64(timestamp.UnixNano()) {
+		t.Errorf("timestamp does not match: expected %d, but found %d", uint64(timestamp.UnixNano()), evtReader.Timestamp())
+	}
 	var i int
 	for {
 		n, err := reader.Read(tmp)
@@ -133,11 +141,13 @@ func TestEventWriterEventReader(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		} else if n == 0 || tmp[0] != byte(0) {
-			t.Errorf("Failed reading byte #%d in event", i)
+			t.Errorf("failed reading byte #%d in event", i)
 		}
 		i++
 	}
 	if i != int(evtSize) {
-		t.Errorf("Expected reading %d bytes, but found %d", evtSize, i)
+		t.Errorf("expected reading %d bytes, but found %d", evtSize, i)
 	}
+
+	writers.Free()
 }

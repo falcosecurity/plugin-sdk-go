@@ -28,32 +28,51 @@ import (
 
 var errTest = fmt.Errorf("test")
 
-type pluginContext struct {
+type sampleLastErr struct {
 	lastErrBuf ptr.StringBuffer
 	lastErr    error
 }
 
-func (p *pluginContext) LastError() error {
-	return p.lastErr
+func (s *sampleLastErr) LastError() error {
+	return s.lastErr
 }
 
-func (p *pluginContext) SetLastError(err error) {
-	p.lastErr = err
+func (s *sampleLastErr) SetLastError(err error) {
+	s.lastErr = err
 }
 
-func (p *pluginContext) LastErrorBuffer() sdk.StringBuffer {
-	return &p.lastErrBuf
+func (s *sampleLastErr) LastErrorBuffer() sdk.StringBuffer {
+	return &s.lastErrBuf
+}
+
+func assertPanic(t *testing.T, fun func()) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("expected panic")
+		}
+	}()
+	fun()
 }
 
 func TestLastErr(t *testing.T) {
-	pCtx := &pluginContext{}
-	pCtx.SetLastError(errTest)
-	p := cgo.NewHandle(pCtx)
+	sample := &sampleLastErr{}
+	defer sample.LastErrorBuffer().Free()
+	sample.SetLastError(errTest)
+	handle := cgo.NewHandle(sample)
+	defer handle.Delete()
 
-	cStr := plugin_get_last_error(_Ctype_uintptr_t(p))
+	cStr := plugin_get_last_error(_Ctype_uintptr_t(handle))
 	errStr := ptr.GoString(unsafe.Pointer(cStr))
 
 	if errTest.Error() != errStr {
-		t.Fatalf(`expected: "%s" - got: "%s"`, errTest.Error(), errStr)
+		t.Fatalf("expected %s, but found %s", errTest.Error(), errStr)
 	}
+}
+
+func TestLastErrPanic(t *testing.T) {
+	handle := cgo.NewHandle(int64(0))
+	defer handle.Delete()
+	assertPanic(t, func() {
+		plugin_get_last_error(_Ctype_uintptr_t(handle))
+	})
 }
