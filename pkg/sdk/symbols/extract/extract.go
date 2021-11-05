@@ -42,7 +42,6 @@ import (
 func plugin_extract_fields_sync(plgState C.uintptr_t, evt *C.ss_plugin_event, numFields uint32, fields *C.ss_plugin_extract_field) int32 {
 	pHandle := cgo.Handle(plgState)
 	extract := pHandle.Value().(sdk.Extractor)
-	event := (*C.struct_ss_plugin_event)(evt)
 	extrReqs := pHandle.Value().(sdk.ExtractRequests)
 
 	// https://github.com/golang/go/wiki/cgo#turning-c-arrays-into-go-slices
@@ -54,7 +53,7 @@ func plugin_extract_fields_sync(plgState C.uintptr_t, evt *C.ss_plugin_event, nu
 		extrReq = extrReqs.ExtractRequests().Get(int(flds[i].field_id))
 		extrReq.SetPtr(unsafe.Pointer(&flds[i]))
 
-		err := extract.Extract(extrReq, sdk.NewEventReader(unsafe.Pointer(event)))
+		err := extract.Extract(extrReq, sdk.NewEventReader(unsafe.Pointer(evt)))
 		if err != nil {
 			pHandle.Value().(sdk.LastError).SetLastError(err)
 			return sdk.SSPluginFailure
