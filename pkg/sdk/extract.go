@@ -130,7 +130,7 @@ func (e *extractRequest) Arg() string {
 func (e *extractRequest) SetValue(v interface{}) {
 	switch e.FieldType() {
 	case ParamTypeUint64:
-		e.req.res_u64 = (C.ulong)(v.(uint64))
+		e.req.res_u64 = (C.uint64_t)(v.(uint64))
 	case ParamTypeCharBuf:
 		e.strBuf.Write(v.(string))
 		e.req.res_str = (*C.char)(e.strBuf.CharPtr())

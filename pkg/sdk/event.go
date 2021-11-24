@@ -170,7 +170,7 @@ type eventWriter struct {
 
 func newEventWriter(evtPtr unsafe.Pointer, dataSize int64) (*eventWriter, error) {
 	evt := (*C.ss_plugin_event)(evtPtr)
-	evt.ts = C.ulong(C.UINT64_MAX)
+	evt.ts = C.uint64_t(C.UINT64_MAX)
 	evt.data = (*C.uchar)(C.malloc(C.size_t(dataSize)))
 	evt.datalen = 0
 	brw, err := ptr.NewBytesReadWriter(unsafe.Pointer(evt.data), int64(dataSize), int64(dataSize))
@@ -203,7 +203,7 @@ func (p *eventWriter) Write(data []byte) (n int, err error) {
 }
 
 func (p *eventWriter) SetTimestamp(value uint64) {
-	(*C.ss_plugin_event)(p.ssPluginEvt).ts = C.ulong(value)
+	(*C.ss_plugin_event)(p.ssPluginEvt).ts = C.uint64_t(value)
 }
 
 func (p *eventWriter) free() {
