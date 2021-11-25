@@ -56,8 +56,8 @@ func (s *sampleExtract) LastError() error {
 
 func allocSSPluginExtractField(fid, ftype uint32, fname, farg string) (*_Ctype_ss_plugin_extract_field, func()) {
 	ret := &_Ctype_ss_plugin_extract_field{}
-	ret.field_id = _Ctype_uint(fid)
-	ret.ftype = _Ctype_uint(ftype)
+	ret.field_id = _Ctype_uint32_t(fid)
+	ret.ftype = _Ctype_uint32_t(ftype)
 
 	argBuf := ptr.StringBuffer{}
 	fnameBuf := ptr.StringBuffer{}

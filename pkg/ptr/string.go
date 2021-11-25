@@ -72,7 +72,7 @@ func (s *StringBuffer) Write(str string) {
 		if s.cPtr != nil {
 			C.free(unsafe.Pointer(s.cPtr))
 		}
-		s.cPtr = (*C.char)(C.malloc((C.ulong)(len(str) + 1)))
+		s.cPtr = (*C.char)(C.malloc((C.size_t)(len(str) + 1)))
 	}
 
 	p := (*[1 << 30]byte)(unsafe.Pointer(s.cPtr))
