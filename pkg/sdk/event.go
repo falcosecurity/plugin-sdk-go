@@ -131,7 +131,7 @@ func NewEventWriters(size, dataSize int64) (EventWriters, error) {
 	ret := &eventWriters{
 		evts: make([]*eventWriter, size),
 	}
-	pluginEvtArray := (*C.ss_plugin_event)(C.malloc((C.ulong)(size * C.sizeof_ss_plugin_event)))
+	pluginEvtArray := (*C.ss_plugin_event)(C.malloc((C.size_t)(size * C.sizeof_ss_plugin_event)))
 	var err error
 	for i := range ret.evts {
 		// get i-th element of pluginEvtArray
@@ -171,7 +171,7 @@ type eventWriter struct {
 func newEventWriter(evtPtr unsafe.Pointer, dataSize int64) (*eventWriter, error) {
 	evt := (*C.ss_plugin_event)(evtPtr)
 	evt.ts = C.uint64_t(C.UINT64_MAX)
-	evt.data = (*C.uchar)(C.malloc(C.size_t(dataSize)))
+	evt.data = (*C.uint8_t)(C.malloc(C.size_t(dataSize)))
 	evt.datalen = 0
 	brw, err := ptr.NewBytesReadWriter(unsafe.Pointer(evt.data), int64(dataSize), int64(dataSize))
 
@@ -198,7 +198,7 @@ func (p *eventWriter) Write(data []byte) (n int, err error) {
 	if err != nil {
 		return
 	}
-	(*C.ss_plugin_event)(p.ssPluginEvt).datalen += C.uint(n)
+	(*C.ss_plugin_event)(p.ssPluginEvt).datalen += C.uint32_t(n)
 	return
 }
 
