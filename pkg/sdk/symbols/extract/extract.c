@@ -74,7 +74,7 @@ bool async_extractor_wait(async_extractor_info *ainfo)
 	struct timeval start_time;
 	gettimeofday(&start_time, NULL);
 
-	while(!atomic_compare_exchange_strong_explicit(&ainfo->lock, &old_val, PROCESSING, memory_order_seq_cst, memory_order_seq_cst))
+	while(!atomic_compare_exchange_strong_explicit(&ainfo->lock, (int*) &old_val, PROCESSING, memory_order_seq_cst, memory_order_seq_cst))
 	{
 		// shutdown
 		if(old_val == SHUTDOWN_REQ)
@@ -119,7 +119,7 @@ static void async_extractor_init(async_extractor_info *ainfo)
 static void async_extractor_shutdown(async_extractor_info *ainfo)
 {
 	enum async_extractor_state old_val = DONE;
-	while (atomic_compare_exchange_strong_explicit(&ainfo->lock, &old_val, SHUTDOWN_REQ, memory_order_seq_cst, memory_order_seq_cst))
+	while (atomic_compare_exchange_strong_explicit(&ainfo->lock, (int*) &old_val, SHUTDOWN_REQ, memory_order_seq_cst, memory_order_seq_cst))
 	{
 		old_val = DONE;
 	}
@@ -136,7 +136,7 @@ static int32_t async_extractor_extract_field(async_extractor_info *ainfo,
 	ainfo->field = field;
 
 	enum async_extractor_state old_val = DONE;
-	while (!atomic_compare_exchange_strong_explicit(&ainfo->lock, &old_val, INPUT_READY, memory_order_seq_cst, memory_order_seq_cst))
+	while (!atomic_compare_exchange_strong_explicit(&ainfo->lock, (int*) &old_val, INPUT_READY, memory_order_seq_cst, memory_order_seq_cst))
 	{
 		old_val = DONE;
 	}
