@@ -21,12 +21,20 @@ package extract
 */
 import "C"
 import (
-	"unsafe"
-
-	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
+	"sync/atomic"
+	"time"
 )
 
-var asyncWorkerRunning bool
+const (
+	state_wait = iota
+	state_data_req
+	state_exit_req
+	state_exit_ack
+)
+
+const starvationThresholdNs = 1e6
+
+var asyncCtx *C.async_extractor_info
 
 // StartAsync initializes and starts the asynchronous extraction mode.
 // Once StartAsync has been called, StopAsync must be called before terminating
@@ -47,30 +55,47 @@ var asyncWorkerRunning bool
 // After calling StartAsync, the framework automatically shift the extraction
 // strategy from the regular C -> Go call one to the alternative worker
 // synchronization one.
-func StartAsync(e sdk.Extractor) {
-	if asyncWorkerRunning {
+func StartAsync() {
+	if asyncCtx != nil {
 		panic("plugin-sdk-go/sdk/symbols/extract: async worker already started")
 	}
-	asyncWorkerRunning = true
-	info := C.create_async_extractor()
-	go func() {
-		extrReqs := e.(sdk.ExtractRequests)
-		var extrReq sdk.ExtractRequest
-		var field *C.struct_ss_plugin_extract_field
-		var event *C.struct_ss_plugin_event
-		for C.async_extractor_wait(info) {
-			info.rc = C.int32_t(sdk.SSPluginSuccess)
-			event = (*C.struct_ss_plugin_event)(info.evt)
-			field = (*C.struct_ss_plugin_extract_field)(info.field)
-			field.field_present = false
-			extrReq = extrReqs.ExtractRequests().Get(int(field.field_id))
-			extrReq.SetPtr(unsafe.Pointer(field))
+	asyncCtx = C.async_init()
 
-			err := e.Extract(extrReq, sdk.NewEventReader(unsafe.Pointer(event)))
-			if err != nil {
-				e.(sdk.LastError).SetLastError(err)
-				info.rc = C.int32_t(sdk.SSPluginFailure)
-				continue
+	go func() {
+		lock := (*int32)(&asyncCtx.lock)
+		waitStartTime := time.Now().Nanosecond()
+
+		for {
+			// Check for incoming request, if any, otherwise busy waits
+			switch atomic.LoadInt32(lock) {
+
+			case state_data_req:
+				// Incoming data request. Process it...
+				asyncCtx.rc = C.int32_t(
+					plugin_extract_fields_sync(
+						C.uintptr_t(uintptr(asyncCtx.s)),
+						asyncCtx.evt,
+						uint32(asyncCtx.num_fields),
+						asyncCtx.fields,
+					),
+				)
+				// Processing done, return back to waiting state
+				atomic.StoreInt32(lock, state_wait)
+				// Reset waiting start time
+				waitStartTime = 0
+
+			case state_exit_req:
+				// Incoming exit request. Send ack and exit.
+				atomic.StoreInt32(lock, state_exit_ack)
+				return
+
+			default:
+				// busy wait, then sleep after 1ms
+				if waitStartTime == 0 {
+					waitStartTime = time.Now().Nanosecond()
+				} else if time.Now().Nanosecond()-waitStartTime > starvationThresholdNs {
+					time.Sleep(time.Nanosecond)
+				}
 			}
 		}
 	}()
@@ -78,7 +103,21 @@ func StartAsync(e sdk.Extractor) {
 
 // StopAsync deinitializes and stops the asynchronous extraction mode, and
 // must be called after StartAsync.
-func StopAsync(e sdk.Extractor) {
-	C.destroy_async_extractor()
-	asyncWorkerRunning = false
+func StopAsync() {
+	if asyncCtx == nil {
+		panic("plugin-sdk-go/sdk/symbols/extract: async worker not started")
+	}
+
+	lock := (*int32)(&asyncCtx.lock)
+
+	for !atomic.CompareAndSwapInt32(lock, state_wait, state_exit_req) {
+
+	}
+
+	// state_exit_req acquired, wait for worker exiting
+	for atomic.LoadInt32(lock) != state_exit_ack {
+
+	}
+	asyncCtx = nil
+	C.async_deinit()
 }
