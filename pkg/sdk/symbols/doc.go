@@ -50,6 +50,7 @@ limitations under the License.
 //  - extract:      plugin_extract_fields
 //  - evtstr:       plugin_event_to_string
 //  - progress:     plugin_get_progress
+//  - read:         plugin_read
 //
 // There are no horizontal dependencies between the sub-packages, which means
 // that they are independent from one another. Each sub-package only depends
