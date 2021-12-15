@@ -43,6 +43,7 @@ const (
 const (
 	TypeSourcePlugin    uint32 = 1
 	TypeExtractorPlugin uint32 = 2
+	TypeCapturePlugin   uint32 = 3
 )
 
 // DefaultEvtSize is the default size for the data payload allocated

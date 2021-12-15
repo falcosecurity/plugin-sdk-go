@@ -76,3 +76,37 @@ type NextBatcher interface {
 type Progresser interface {
 	Progress(pState PluginState) (float64, string)
 }
+
+// Reader is analoguous to io.Reader in both signature and semantics,
+// but adjusted to also pass a PluginState.
+//
+// Read reads up to len(p) bytes into p. It returns the number of bytes
+// read (0 <= n <= len(p)) and any error encountered.
+// Even if Read returns n < len(p), it may use all of p as scratch space
+// during the call.
+// If some data is available but not len(p) bytes, Read conventionally
+// returns what is available instead of waiting for more.
+//
+// When Read encounters an error or end-of-file condition after successfully
+// reading n > 0 bytes, it returns the number of bytes read.
+// It may return the (non-nil) error from the same call or return the error
+// (and n == 0) from a subsequent call.
+//
+// An instance of this general case is that a Reader returning a non-zero
+// number of bytes at the end of the input stream may return either
+// err == EOF or err == nil. The next Read should return 0, EOF.
+// The EOF error can be one of ErrEOF or io.EOF. ErrTimeout can be returned
+// to indicate that no more bytes are currently available, but that they can
+// be available in future calls to Read.
+//
+// Callers should always process the n > 0 bytes returned before considering
+// the error err. Doing so correctly handles I/O errors that happen after
+// reading some bytes and also both of the allowed EOF behaviors.
+//
+// Implementations of Read must not return a zero byte count with a nil error,
+// except when len(p) == 0.
+//
+// Implementations must not retain p.
+type Reader interface {
+	Read(pState PluginState, p []byte) (n int, err error)
+}
