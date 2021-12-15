@@ -21,14 +21,18 @@ limitations under the License.
 
 typedef struct async_extractor_info
 {
-	// Pointer as this allows swapping out events from other
-	// structs.
-	atomic_int lock;
+	// lock
+	atomic_int_least32_t lock;
+
+	// input data
+	ss_plugin_t *s;
 	const ss_plugin_event *evt;
-	ss_plugin_extract_field *field;
+	uint32_t num_fields;
+	ss_plugin_extract_field *fields;
+
+	// output data
 	int32_t rc;
 } async_extractor_info;
 
-async_extractor_info * create_async_extractor();
-void destroy_async_extractor();
-bool async_extractor_wait(async_extractor_info *ainfo);
+async_extractor_info *async_init();
+void async_deinit();
