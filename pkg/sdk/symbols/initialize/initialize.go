@@ -46,6 +46,7 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/cgo"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
+	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/internal/hooks"
 )
 
 type baseInit struct {
@@ -107,6 +108,7 @@ func plugin_init(config *C.char, rc *int32) C.uintptr_t {
 func plugin_destroy(pState C.uintptr_t) {
 	if pState != 0 {
 		handle := cgo.Handle(pState)
+		hooks.OnDestroy()(handle)
 		if state, ok := handle.Value().(sdk.Destroyer); ok {
 			state.Destroy()
 		}
