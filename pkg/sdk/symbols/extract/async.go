@@ -88,6 +88,7 @@ func StartAsync() {
 	}
 
 	asyncCtx = C.async_init()
+	atomic.StoreInt32((*int32)(&asyncCtx.lock), state_wait)
 	go func() {
 		lock := (*int32)(&asyncCtx.lock)
 		waitStartTime := time.Now().Nanosecond()
