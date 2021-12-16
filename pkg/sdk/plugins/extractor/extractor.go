@@ -19,9 +19,11 @@ limitations under the License.
 package extractor
 
 import (
+	"github.com/falcosecurity/plugin-sdk-go/pkg/cgo"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
+	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/internal/hooks"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins"
-	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/extract"
+	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/extract"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/fields"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/info"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/initialize"
@@ -78,7 +80,12 @@ func Register(p Plugin) {
 
 	initialize.SetOnInit(func(c string) (sdk.PluginState, error) {
 		err := p.Init(c)
+		extract.StartAsync()
 		return p, err
+	})
+
+	hooks.SetOnDestroy(func(handle cgo.Handle) {
+		extract.StopAsync()
 	})
 
 	registered = true
