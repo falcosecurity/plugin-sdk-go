@@ -101,14 +101,19 @@ func plugin_init(config *C.char, rc *int32) C.uintptr_t {
 		*rc = sdk.SSPluginSuccess
 	}
 
-	return (C.uintptr_t)(cgo.NewHandle(state))
+	handle := cgo.NewHandle(state)
+	if *rc == sdk.SSPluginSuccess {
+		hooks.OnAfterInit()(handle)
+	}
+
+	return (C.uintptr_t)(handle)
 }
 
 //export plugin_destroy
 func plugin_destroy(pState C.uintptr_t) {
 	if pState != 0 {
 		handle := cgo.Handle(pState)
-		hooks.OnDestroy()(handle)
+		hooks.OnBeforeDestroy()(handle)
 		if state, ok := handle.Value().(sdk.Destroyer); ok {
 			state.Destroy()
 		}

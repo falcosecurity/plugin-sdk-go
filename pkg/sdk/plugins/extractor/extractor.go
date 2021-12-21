@@ -80,11 +80,14 @@ func Register(p Plugin) {
 
 	initialize.SetOnInit(func(c string) (sdk.PluginState, error) {
 		err := p.Init(c)
-		extract.StartAsync()
 		return p, err
 	})
 
-	hooks.SetOnDestroy(func(handle cgo.Handle) {
+	// setup hooks for automatically start/stop async extraction
+	hooks.SetOnAfterInit(func(handle cgo.Handle) {
+		extract.StartAsync()
+	})
+	hooks.SetOnBeforeDestroy(func(handle cgo.Handle) {
 		extract.StopAsync()
 	})
 
