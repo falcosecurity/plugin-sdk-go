@@ -14,30 +14,43 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package hooks contains a set of init/destroy related hooks to meant
-// to be used internally in the SDK.
+// Package hooks contains a set of hooks to be used internally in the SDK.
 package hooks
 
 import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/cgo"
 )
 
-// OnDestroyFn is a callback used in plugin_destroy.
-type OnDestroyFn func(handle cgo.Handle)
+type OnBeforeDestroyFn func(handle cgo.Handle)
+type OnAfterInitFn func(handle cgo.Handle)
 
-var onDestroy OnDestroyFn = func(cgo.Handle) {}
+var (
+	onBeforeDestroy OnBeforeDestroyFn = func(cgo.Handle) {}
+	onAfterInit     OnAfterInitFn     = func(cgo.Handle) {}
+)
 
-// SetOnDestroy sets an deinitialization callback to be called in plugin_destroy to
-// release some resources the plugin state.
-func SetOnDestroy(fn OnDestroyFn) {
+// SetOnBeforeDestroy sets a callback that is invoked before the Destroy() method.
+func SetOnBeforeDestroy(fn OnBeforeDestroyFn) {
 	if fn == nil {
-		panic("plugin-sdk-go/sdk/symbols/initialize.SetOnDestroy: fn must not be nil")
+		panic("plugin-sdk-go/sdk/symbols/initialize.SetOnBeforeDestroy: fn must not be nil")
 	}
-	onDestroy = fn
+	onBeforeDestroy = fn
 }
 
-// OnDestroy returns the currently set deinitialization callback to
-// be called in plugin_destroy
-func OnDestroy() OnDestroyFn {
-	return onDestroy
+// OnBeforeDestroy returns a callback that is invoked before the Destroy() method.
+func OnBeforeDestroy() OnBeforeDestroyFn {
+	return onBeforeDestroy
+}
+
+// SetOnAfterInit sets a callback that is invoked after the Init() method.
+func SetOnAfterInit(fn OnAfterInitFn) {
+	if fn == nil {
+		panic("plugin-sdk-go/sdk/symbols/initialize.SetOnAfterInit: fn must not be nil")
+	}
+	onAfterInit = fn
+}
+
+// OnAfterInit returns a callback that is invoked after the Init() method.
+func OnAfterInit() OnAfterInitFn {
+	return onAfterInit
 }
