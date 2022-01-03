@@ -112,5 +112,5 @@ type FieldEntry struct {
 	ArgRequired bool   `json:"argRequired"`
 	Display     string `json:"display"`
 	Desc        string `json:"desc"`
-	Properties  string `json:"properties"`
+	Properties  []string `json:"properties"`
 }
