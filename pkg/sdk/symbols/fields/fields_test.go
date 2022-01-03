@@ -19,6 +19,7 @@ package fields
 import (
 	"encoding/json"
 	"testing"
+	"reflect"
 	"unsafe"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
@@ -39,7 +40,7 @@ func TestFields(t *testing.T) {
 		t.Errorf("expected %d, but found %d", len(sampleFields), len(Fields()))
 	}
 	for i, f := range Fields() {
-		if f != sampleFields[i] {
+		if ! reflect.DeepEqual(f, sampleFields[i]) {
 			t.Errorf("wrong sample at index %d", i)
 		}
 	}
