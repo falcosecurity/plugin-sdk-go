@@ -112,7 +112,7 @@ type FieldEntry struct {
 	ArgRequired bool   `json:"argRequired"`
 	Display     string `json:"display"`
 	Desc        string `json:"desc"`
-	Properties  string `json:"properties"`
+	Properties  []string `json:"properties"`
 }
 
 // OpenParam represents a valid parameter for plugin_open().
