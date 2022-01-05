@@ -128,9 +128,7 @@ func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (i
 
 // Progress returns a percentage indicator referring to the production progress
 // of the event source of this plugin.
-// This method is optional for source plugins. If specified, the following
-// package needs to be imported to advise the SDK to enable this feature:
-// 	import _ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/progress"
+// This method is optional for source plugins.
 // func (m *MyInstance) Progress(pState sdk.PluginState) (float64, string) {
 //
 // }
