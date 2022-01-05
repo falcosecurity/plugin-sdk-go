@@ -39,6 +39,7 @@ type Info struct {
 // plugin deinitialization.
 type Plugin interface {
 	// (optional): sdk.Destroyer
+	// (optional): sdk.InitSchema
 	sdk.LastError
 	sdk.LastErrorBuffer
 	//

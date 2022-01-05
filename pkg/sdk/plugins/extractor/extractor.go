@@ -27,6 +27,7 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/fields"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/info"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/initialize"
+	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/initschema"
 	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/lasterr"
 )
 
@@ -75,6 +76,9 @@ func Register(p Plugin) {
 	info.SetVersion(i.Version)
 	info.SetRequiredAPIVersion(i.RequiredAPIVersion)
 	info.SetExtractEventSources(i.ExtractEventSources)
+	if initSchema, ok := p.(sdk.InitSchema); ok {
+		initschema.SetInitSchema(initSchema.InitSchema())
+	}
 
 	fields.SetFields(p.Fields())
 
