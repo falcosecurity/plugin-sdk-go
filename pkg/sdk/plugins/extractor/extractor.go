@@ -86,9 +86,9 @@ func Register(p Plugin) {
 	// setup hooks for automatically start/stop async extraction
 	hooks.SetOnAfterInit(func(handle cgo.Handle) {
 		extract.StartAsync()
-	})
-	hooks.SetOnBeforeDestroy(func(handle cgo.Handle) {
-		extract.StopAsync()
+		hooks.SetOnBeforeDestroy(func(handle cgo.Handle) {
+			extract.StopAsync()
+		})
 	})
 
 	registered = true
