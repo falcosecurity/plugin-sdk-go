@@ -26,15 +26,26 @@ package main
 
 import (
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"
 
+	"github.com/alecthomas/jsonschema"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins/extractor"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins/source"
 )
+
+// Defining a type for the plugin configuration.
+// In this simple example, users can define the starting value the event
+// counter. the `jsonschema` tags is used to automatically generate a
+// JSON Schema definition, so that the framework can perform automatic
+// validations.
+type MyPluginConfig struct {
+	Start uint64 `json:"start" jsonschema:"title=start value,description=The starting value of each counter"`
+}
 
 // Defining a type for the plugin.
 // Composing the struct with plugins.BasePlugin is the recommended practice
@@ -42,10 +53,9 @@ import (
 // requirements of the SDK.
 //
 // State variables to store in the plugin must be defined here.
-// In this simple example, we store the configuration string passed by the
-// SDK during the plugin initialization.
 type MyPlugin struct {
 	plugins.BasePlugin
+	config MyPluginConfig
 }
 
 // Defining a type for the plugin source capture instances returned by Open().
@@ -90,9 +100,37 @@ func (m *MyPlugin) Info() *plugins.Info {
 	}
 }
 
-// Init initializes this plugin with a given config string, which is unused
-// in this example. This method is mandatory for source plugins.
+// InitSchema is gets called by the SDK before initializing the plugin.
+// This returns a schema representing the configuration expected by the
+// plugin to be passed to the Init() method. Defining InitSchema() allows
+// the framework to automatically validate the configuration, so that the
+// plugin can assume that it to be always be well-formed when passed to Init().
+// This is ignored if the return value is nil. The returned schema must follow
+// the JSON Schema specific. See: https://json-schema.org/
+// This method is optional for source plugins.
+func (m *MyPlugin) InitSchema() *sdk.SchemaInfo {
+	// We leverage the jsonschema package to autogenerate the
+	// JSON Schema definition using reflection from our config struct.
+	schema, err := jsonschema.Reflect(&MyPluginConfig{}).MarshalJSON()
+	if err == nil {
+		return &sdk.SchemaInfo{
+			Schema: string(schema),
+		}
+	}
+	return nil
+}
+
+// Init initializes this plugin with a given config string.
+// Since this plugin defines the InitSchema() method, we can assume
+// that the configuration is pre-validated by the framework and
+// always well-formed according to the provided schema.
+// This method is mandatory for source plugins.
 func (m *MyPlugin) Init(config string) error {
+	// Deserialize the config json. Ignoring the error
+	// and not validating the config values is possible
+	// due to the schema defined through InitSchema(),
+	// for which the framework performas a pre-validation.
+	json.Unmarshal([]byte(config), &m.config)
 	return nil
 }
 
@@ -157,7 +195,7 @@ func (m *MyPlugin) Open(params string) (source.Instance, error) {
 	}
 
 	myInstance := &MyInstance{
-		counter: 0,
+		counter: m.config.Start,
 	}
 	myInstance.SetEvents(myBatch)
 	return myInstance, nil
