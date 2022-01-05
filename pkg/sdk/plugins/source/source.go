@@ -27,6 +27,7 @@ import (
 	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/lasterr"
 	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/nextbatch"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/open"
+	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/progress"
 )
 
 var registered = false
@@ -63,9 +64,6 @@ type Plugin interface {
 // optionally implement sdk.Closer and sdk.Progresser.
 // If sdk.Closer is implemented, the Close method will be called while closing
 // the source capture session.
-// If sdk.Progresser is implemented, the sdk/symbols/progress package will need
-// to be imported as following:
-// 	import _ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/progress
 type Instance interface {
 	// (optional) sdk.Closer
 	// (optional) sdk.Progresser
