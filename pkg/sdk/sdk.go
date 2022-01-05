@@ -120,3 +120,9 @@ type OpenParam struct {
 	Value string `json:"value"`
 	Desc  string `json:"desc"`
 }
+
+// SchemaInfo represent a schema describing a structured data type.
+// Should be used when implementing plugin_get_init_schema().
+type SchemaInfo struct {
+	Schema string
+}

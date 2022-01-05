@@ -69,3 +69,18 @@ type Extractor interface {
 type OpenParams interface {
 	OpenParams() ([]OpenParam, error)
 }
+
+// InitSchema is an interface wrapping the basic InitSchema method.
+// InitSchema is meant to be used in plugin_get_init_schema() to return a
+// schema describing the data expected to be passed as a configuration
+// during the plugin initialization. The schema must follow the JSON Schema
+// specific: https://json-schema.org/. A nil return value is interpreted
+// as the absence of a schema, and the init configuration will not be
+// pre-validated by the framework. If JSON Schema is returned, the
+// init configuration will be expected to be a json-formatted string.
+// If so, the init() function can assume the configuration to be well-formed
+// according to the returned schema, as the framework will perform a
+// pre-validation before initializing the plugin.
+type InitSchema interface {
+	InitSchema() *SchemaInfo
+}
