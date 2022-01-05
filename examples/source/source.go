@@ -147,4 +147,16 @@ func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (i
 //
 // }
 
+// InitSchema is gets called by the SDK before initializing the plugin.
+// This returns a schema representing the configuration expected by the
+// plugin to be passed to the Init() method. Defining InitSchema() allows
+// the framework to automatically validate the configuration, so that the
+// plugin can assume that it to be always be well-formed when passed to Init().
+// This is ignored if the return value is nil. The returned schema must follow
+// the JSON Schema specific. See: https://json-schema.org/
+// This method is optional for extractor plugins.
+// func (m *MyPlugin) InitSchema() *sdk.SchemaInfo {
+//
+// }
+
 func main() {}
