@@ -24,6 +24,7 @@ import (
 	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/evtstr"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/info"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/initialize"
+	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/initschema"
 	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/lasterr"
 	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/listopen"
 	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/nextbatch"
@@ -110,6 +111,9 @@ func Register(p Plugin) {
 	info.SetVersion(i.Version)
 	info.SetRequiredAPIVersion(i.RequiredAPIVersion)
 	info.SetExtractEventSources(i.ExtractEventSources)
+	if initSchema, ok := p.(sdk.InitSchema); ok {
+		initschema.SetInitSchema(initSchema.InitSchema())
+	}
 
 	initialize.SetOnInit(func(c string) (sdk.PluginState, error) {
 		err := p.Init(c)
