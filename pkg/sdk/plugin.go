@@ -61,3 +61,11 @@ type Stringer interface {
 type Extractor interface {
 	Extract(req ExtractRequest, evt EventReader) error
 }
+
+// OpenParams is an interface wrapping the basic OpenParams method.
+// OpenParams is meant to be used in plugin_list_open_params() to return a list
+// of suggested parameters that would be accepted as valid arguments
+// for plugin_open().
+type OpenParams interface {
+	OpenParams() ([]OpenParam, error)
+}
