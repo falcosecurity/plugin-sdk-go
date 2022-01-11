@@ -65,3 +65,10 @@ type StringerBuffer interface {
 type ProgressBuffer interface {
 	ProgressBuffer() StringBuffer
 }
+
+// OpenParamsBuffer is an interface wrapping the basic OpenParamsBuffer method.
+// OpenParamsBuffer returns a StringBuffer meant to be used as buffer for
+// plugin_list_open_params().
+type OpenParamsBuffer interface {
+	OpenParamsBuffer() StringBuffer
+}

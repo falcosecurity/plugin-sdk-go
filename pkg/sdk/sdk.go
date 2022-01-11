@@ -114,3 +114,9 @@ type FieldEntry struct {
 	Desc        string `json:"desc"`
 	Properties  string `json:"properties"`
 }
+
+// OpenParam represents a valid parameter for plugin_open().
+type OpenParam struct {
+	Value string `json:"value"`
+	Desc  string `json:"desc"`
+}
