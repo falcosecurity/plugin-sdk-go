@@ -129,6 +129,17 @@ func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 	}
 }
 
+// OpenParams returns a list of suggested parameters that would be accepted
+// as valid arguments to Open(). This method is optional for source plugins.
+func (m *MyPlugin) OpenParams() ([]sdk.OpenParam, error) {
+	return []sdk.OpenParam{
+		{
+			Value: "file:///hello-world.bin",
+			Desc:  "A resource that can be opened by this plugin. This is not used here and just serves an example.",
+		},
+	}, nil
+}
+
 // Open opens the plugin source and starts a new capture session (e.g. stream
 // of events), creating a new plugin instance. The state of each instance can
 // be initialized here. This method is mandatory for source plugins.
