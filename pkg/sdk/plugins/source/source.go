@@ -25,6 +25,7 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/info"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/initialize"
 	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/lasterr"
+	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/listopen"
 	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/nextbatch"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/open"
 	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/progress"
@@ -37,6 +38,9 @@ type Plugin interface {
 	plugins.Plugin
 	sdk.Stringer
 	sdk.StringerBuffer
+	sdk.OpenParamsBuffer
+	// (optional) sdk.OpenParams
+
 	//
 	// Open opens the source and starts a capture (e.g. stream of events).
 	//

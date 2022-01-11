@@ -114,6 +114,15 @@ func (b *BaseProgress) ProgressBuffer() sdk.StringBuffer {
 	return &b.progressBuf
 }
 
+// BaseOpenParams is a base implementation of the sdk.OpenParamsBuffer interface.
+type BaseOpenParams struct {
+	openParamsBuf ptr.StringBuffer
+}
+
+func (b *BaseOpenParams) OpenParamsBuffer() sdk.StringBuffer {
+	return &b.openParamsBuf
+}
+
 // BasePlugin is a base implementation of the Plugin interface.
 // Developer-defined Plugin implementations should be composed with BasePlugin
 // to have out-of-the-box compliance with all the required interfaces.
@@ -121,4 +130,5 @@ type BasePlugin struct {
 	BaseLastError
 	BaseStringer
 	BaseExtractRequests
+	BaseOpenParams
 }
