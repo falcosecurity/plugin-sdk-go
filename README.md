@@ -10,11 +10,11 @@ Note: *The plugin system is a new feature introduced since Falco 0.31.0. You can
 
 ## Introduction
 
-This SDK facilitates writing [plugins](https://deploy-preview-493--falcosecurity.netlify.app/docs/plugins) for [Falco](https://github.com/falcosecurity/falco) or application using [Falcosecurity's libs](https://github.com/falcosecurity/libs).
+This SDK facilitates writing [plugins](https://falco.org/docs/plugins) for [Falco](https://github.com/falcosecurity/falco) or application using [Falcosecurity's libs](https://github.com/falcosecurity/libs).
 
 ## Quick start
 
-Before using this SDK, review the [developer's guide](https://deploy-preview-493--falcosecurity.netlify.app/docs/plugins/developers_guide/) which fully documents the API and provides best practices for writing plugins. The developer's guide includes a [walkthrough](https://deploy-preview-493--falcosecurity.netlify.app/docs/plugins/developers_guide/#example-go-plugin-dummy) of a plugin written in Go that uses this package.
+Before using this SDK, review the [developer's guide](https://falco.org/docs/plugins/developers_guide/) which fully documents the API and provides best practices for writing plugins. The developer's guide includes a [walkthrough](https://falco.org/docs/plugins/developers_guide/#example-go-plugin-dummy) of a plugin written in Go that uses this package.
 
 For a quick start, you can refer to the provided examples:
  - [extractor plugin](https://github.com/falcosecurity/plugin-sdk-go/tree/main/examples/extractor) 
