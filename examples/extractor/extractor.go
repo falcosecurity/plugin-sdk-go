@@ -58,7 +58,6 @@ func (m *MyPlugin) Info() *plugins.Info {
 		Description:         "An Extractor Plugin Example",
 		Contact:             "github.com/falcosecurity/plugin-sdk-go/",
 		Version:             "0.1.0",
-		RequiredAPIVersion:  "0.2.0",
 		ExtractEventSources: []string{"example"},
 	}
 }
