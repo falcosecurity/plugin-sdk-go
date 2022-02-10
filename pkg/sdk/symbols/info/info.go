@@ -30,6 +30,9 @@ limitations under the License.
 // your plugin exports those symbols by other means.
 package info
 
+/*
+#include "info.h"
+*/
 import "C"
 import (
 	"encoding/json"
@@ -109,6 +112,9 @@ func SetVersion(version string) {
 
 //export plugin_get_required_api_version
 func plugin_get_required_api_version() *C.char {
+	if pRequiredAPIVersion.String() == "" {
+		return C.get_default_required_api_version()
+	}
 	return (*C.char)(pRequiredAPIVersion.CharPtr())
 }
 

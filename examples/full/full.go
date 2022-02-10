@@ -90,13 +90,12 @@ func init() {
 // This method is mandatory for source plugins.
 func (m *MyPlugin) Info() *plugins.Info {
 	return &plugins.Info{
-		ID:                 999,
-		Name:               "full-example",
-		Description:        "A Plugin Example for both Source and Extraction",
-		Contact:            "github.com/falcosecurity/plugin-sdk-go/",
-		Version:            "0.1.0",
-		RequiredAPIVersion: "0.2.0",
-		EventSource:        "example",
+		ID:          999,
+		Name:        "full-example",
+		Description: "A Plugin Example for both Source and Extraction",
+		Contact:     "github.com/falcosecurity/plugin-sdk-go/",
+		Version:     "0.1.0",
+		EventSource: "example",
 	}
 }
 
