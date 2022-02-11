@@ -35,8 +35,8 @@ type ExtractRequest interface {
 	FieldID() uint64
 	//
 	// FieldType returns the type of the field for which the value extraction
-	// is requested. For now, only sdk.ParamTypeUint64 and
-	// sdk.ParamTypeCharBuf are supported.
+	// is requested. For now, only sdk.FieldTypeUint64 and
+	// sdk.FieldTypeCharBuf are supported.
 	FieldType() uint32
 	//
 	// Field returns the name of the field for which the value extraction
@@ -129,9 +129,9 @@ func (e *extractRequest) Arg() string {
 
 func (e *extractRequest) SetValue(v interface{}) {
 	switch e.FieldType() {
-	case ParamTypeUint64:
+	case FieldTypeUint64:
 		e.req.res_u64 = (C.uint64_t)(v.(uint64))
-	case ParamTypeCharBuf:
+	case FieldTypeCharBuf:
 		e.strBuf.Write(v.(string))
 		e.req.res_str = (*C.char)(e.strBuf.CharPtr())
 	default:

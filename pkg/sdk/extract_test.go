@@ -59,9 +59,9 @@ func TestNewExtractRequestPool(t *testing.T) {
 	// Access should be non-contiguous
 	for i := 0; i < 20; i += 2 {
 		req := pool.Get(i)
-		cstruct, freeCStruct := allocSSPluginExtractField(5, ParamTypeUint64, "test.field", "arg")
+		cstruct, freeCStruct := allocSSPluginExtractField(5, FieldTypeUint64, "test.field", "arg")
 		req.SetPtr(unsafe.Pointer(cstruct))
-		if req.FieldType() != ParamTypeUint64 || req.FieldID() != 5 || req.Field() != "test.field" || req.Arg() != "arg" {
+		if req.FieldType() != FieldTypeUint64 || req.FieldID() != 5 || req.Field() != "test.field" || req.Arg() != "arg" {
 			println(req.FieldType(), ", ", req.FieldID(), ", ", req.Field(), ", ", req.Arg())
 			t.Errorf("could not read fields from sdk.ExtractRequest")
 		}
@@ -72,8 +72,8 @@ func TestNewExtractRequestPool(t *testing.T) {
 
 func TestExtractRequestSetValue(t *testing.T) {
 	pool := NewExtractRequestPool()
-	u64Ptr, freeU64Ptr := allocSSPluginExtractField(1, ParamTypeUint64, "test.u64", "")
-	strPtr, freeStrPtr := allocSSPluginExtractField(2, ParamTypeCharBuf, "test.str", "")
+	u64Ptr, freeU64Ptr := allocSSPluginExtractField(1, FieldTypeUint64, "test.u64", "")
+	strPtr, freeStrPtr := allocSSPluginExtractField(2, FieldTypeCharBuf, "test.str", "")
 	u64Req := pool.Get(0)
 	strReq := pool.Get(1)
 	u64Req.SetPtr(unsafe.Pointer(u64Ptr))

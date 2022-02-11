@@ -110,7 +110,7 @@ func TestExtract(t *testing.T) {
 	evtData := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	event, freeEvent := allocSSPluginEvent(1, uint64(time.Now().UnixNano()), evtData)
 	defer freeEvent()
-	field, freeField := allocSSPluginExtractField(1, sdk.ParamTypeUint64, "test.field", "")
+	field, freeField := allocSSPluginExtractField(1, sdk.FieldTypeUint64, "test.field", "")
 	defer freeField()
 
 	// panic
