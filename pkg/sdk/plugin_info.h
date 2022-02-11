@@ -27,8 +27,8 @@ limitations under the License.
 //
 // API versions of this plugin engine
 //
-#define PLUGIN_API_VERSION_MAJOR 0
-#define PLUGIN_API_VERSION_MINOR 2
+#define PLUGIN_API_VERSION_MAJOR 1
+#define PLUGIN_API_VERSION_MINOR 0
 #define PLUGIN_API_VERSION_PATCH 0
 
 //
@@ -126,25 +126,42 @@ typedef struct ss_plugin_event
 //         * if the field specified by the user is foo.bar, arg will be NULL
 // ftype: the type of the field. Could be derived from the field name alone,
 //   but including here can prevent a second lookup of field names.
+// flist: whether the field can extract lists of values or not.
+//   Could be derived from the field name alone, but including it
+//   here can prevent a second lookup of field names.
 // The following should be filled in by the extraction function:
-// - field_present: set to true if the event has a meaningful
-//   extracted value for the provided field, false otherwise
-// - res_str: if the corresponding field was type==string, this should be
-//   filled in with the string value. The string must be allocated and set
-//   by the plugin.
-// - res_u64: if the corresponding field was type==uint64, this should be
-//   filled in with the uint64 value.
+// - res: this union should be filled with a pointer to an array of values.
+//   The array represent the list of extracted values for this field from a given event.
+//   Each array element should be filled with a char* string if the corresponding
+//   field was type==string, and with a uint64 value if the corresponding field was
+//   type==uint64.
+// - res_len: the length of the array of pointed by res.
+//   If the field is not a list type, then res_len must be either 0 or 1.
+//   If the field is a list type, then res_len can must be any value from 0 to N, depending
+//   on how many values can be extracted from a given event.
+//   Setting res_len to 0 means that no value of this field can be extracted from a given event.
+
 
 typedef struct ss_plugin_extract_field
 {
+	// NOTE: For a given architecture, this has always the same size which
+	// is sizeof(uintptr_t). Adding new value types will not create breaking
+	// changes in the plugin API. However, we must make sure that each added
+	// type is always a pointer.
+	union {
+		const char** str;
+		uint64_t* u64;
+	} res;
+	uint64_t res_len;
+
+	// NOTE: When/if adding new input fields, make sure of appending them
+	// at the end of the struct to avoid introducing breaking changes in the
+	// plugin API.
 	uint32_t field_id;
 	const char* field;
 	const char* arg;
-	uint32_t ftype;
-
-	bool field_present;
-	const char* res_str;
-	uint64_t res_u64;
+	uint32_t ftype;	
+	bool flist;
 } ss_plugin_extract_field;
 
 //
@@ -311,13 +328,15 @@ typedef struct
 	const char* (*get_event_source)();
 	//
 	// Return the list of extractor fields exported by this plugin. Extractor
-	// fields can be used in Falco rule conditions and sysdig filters.
+	// fields can be used in Falco rule conditions.
 	// Required: no
 	// Return value: a string with the list of fields encoded as a json
 	//   array.
 	//   Each field entry is a json object with the following properties:
-	//     "type": one of "string", "uint64"
 	//     "name": a string with a name for the field
+	//     "type": one of "string", "uint64"
+	//     "isList: (optional) If present and set to true, notes
+	//              that the field extracts a list of values.
 	//     "argRequired: (optional) If present and set to true, notes
 	//                   that the field requires an argument e.g. field[arg].
 	//     "display": (optional) If present, a string that will be used to
@@ -392,7 +411,7 @@ typedef struct
 	// - data: the buffer from an event produced by next_batch().
 	// - datalen: the length of the buffer from an event produced by next_batch().
 	// Return value: the text representation of the event. This is used, for example,
-	//   by sysdig to print a line for the given event.
+	//   to print a line for the given event.
 	//   The returned memory pointer must be allocated by the plugin
 	//   and must not be deallocated or modified until the next call to
 	//   event_to_string().
@@ -553,7 +572,7 @@ typedef struct
 	const char* (*get_extract_event_sources)();
 	//
 	// Return the list of extractor fields exported by this plugin. Extractor
-	// fields can be used in Falco rules and sysdig filters.
+	// fields can be used in Falco rules.
 	// Required: yes
 	// Return value: a string with the list of fields encoded as a json
 	//   array.
