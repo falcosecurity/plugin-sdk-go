@@ -18,12 +18,30 @@ package sdk
 
 /*
 #include "plugin_info.h"
+#include <stdlib.h>
+#include <string.h>
+
+// NOTE: This is just an replica of the anonymous union nested inside
+// ss_plugin_extract_field. The only difference is that each union field has
+// one pointer level less than its equivalent of ss_plugin_extract_field.
+// Keep this in sync with plugin_info.h in case new types will be supported.
+typedef union {
+	const char* str;
+	uint64_t u64;
+} field_result_t;
+
 */
 import "C"
 import (
 	"unsafe"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
+)
+
+const (
+	// Initial and minimum length with which the array of results is allocated
+	// for a each extractRequest struct.
+	minResultBufferLen = 10
 )
 
 // ExtractRequest represents an high-level abstraction that wraps a pointer to
@@ -81,7 +99,9 @@ func (e *extractRequestPool) Get(requestIndex int) ExtractRequest {
 	r, ok := e.reqs[uint(requestIndex)]
 	if !ok && requestIndex >= 0 {
 		r = &extractRequest{
-			strBuf: &ptr.StringBuffer{},
+			resBuf:     (*C.field_result_t)(C.malloc((C.size_t)(minResultBufferLen * C.sizeof_field_result_t))),
+			resBufLen:  minResultBufferLen,
+			resStrBufs: []StringBuffer{&ptr.StringBuffer{}},
 		}
 		e.reqs[uint(requestIndex)] = r
 	}
@@ -90,7 +110,10 @@ func (e *extractRequestPool) Get(requestIndex int) ExtractRequest {
 
 func (e *extractRequestPool) Free() {
 	for _, v := range e.reqs {
-		v.strBuf.Free()
+		for _, b := range v.resStrBufs {
+			b.Free()
+		}
+		C.free(unsafe.Pointer(v.resBuf))
 	}
 }
 
@@ -103,8 +126,13 @@ func NewExtractRequestPool() ExtractRequestPool {
 }
 
 type extractRequest struct {
-	req    *C.ss_plugin_extract_field
-	strBuf StringBuffer
+	req *C.ss_plugin_extract_field
+	// Pointer to a C-allocated array of field_result_t
+	resBuf *C.field_result_t
+	// Length of the array pointed by resBuf
+	resBufLen uint32
+	// List of StringBuffer to return string results
+	resStrBufs []StringBuffer
 }
 
 func (e *extractRequest) SetPtr(pef unsafe.Pointer) {
@@ -130,12 +158,42 @@ func (e *extractRequest) Arg() string {
 func (e *extractRequest) SetValue(v interface{}) {
 	switch e.FieldType() {
 	case FieldTypeUint64:
-		e.req.res_u64 = (C.uint64_t)(v.(uint64))
+		if e.req.flist {
+			if e.resBufLen < uint32(len(v.([]uint64))) {
+				C.free(unsafe.Pointer(e.resBuf))
+				e.resBufLen = uint32(len(v.([]uint64)))
+				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)(e.resBufLen * C.sizeof_field_result_t)))
+			}
+			for i, val := range v.([]uint64) {
+				*((*C.uint64_t)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (C.uint64_t)(val)
+			}
+			e.req.res_len = (C.uint64_t)(len(v.([]uint64)))
+		} else {
+			*((*C.uint64_t)(unsafe.Pointer(e.resBuf))) = (C.uint64_t)(v.(uint64))
+			e.req.res_len = (C.uint64_t)(1)
+		}
 	case FieldTypeCharBuf:
-		e.strBuf.Write(v.(string))
-		e.req.res_str = (*C.char)(e.strBuf.CharPtr())
+		if e.req.flist {
+			if e.resBufLen < uint32(len(v.([]string))) {
+				C.free(unsafe.Pointer(e.resBuf))
+				e.resBufLen = uint32(len(v.([]string)))
+				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)(e.resBufLen * C.sizeof_field_result_t)))
+			}
+			for i, val := range v.([]string) {
+				if len(e.resStrBufs) <= i {
+					e.resStrBufs = append(e.resStrBufs, &ptr.StringBuffer{})
+				}
+				e.resStrBufs[i].Write(val)
+				*((**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (*C.char)(e.resStrBufs[i].CharPtr())
+			}
+			e.req.res_len = (C.uint64_t)(len(v.([]string)))
+		} else {
+			e.resStrBufs[0].Write(v.(string))
+			*((**C.char)(unsafe.Pointer(e.resBuf))) = (*C.char)(e.resStrBufs[0].CharPtr())
+			e.req.res_len = (C.uint64_t)(1)
+		}
 	default:
 		panic("plugin-sdk-go/sdk: called SetValue with unsupported field type")
 	}
-	e.req.field_present = true
+	*((*C.uintptr_t)(unsafe.Pointer(&e.req.res))) = *(*C.uintptr_t)(unsafe.Pointer(&e.resBuf))
 }
