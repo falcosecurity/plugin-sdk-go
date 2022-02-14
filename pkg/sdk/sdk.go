@@ -60,16 +60,25 @@ const (
 	FieldTypeCharBuf uint32 = 9 // A printable buffer of bytes, NULL terminated
 )
 
-// FieldEntry represents a single field entry that an extractor plugin can expose.
-// Should be used when implementing plugin_get_fields().
+// FieldEntry represents a single field entry that an extractor plugin
+// can expose. Should be used when implementing plugin_get_fields().
 type FieldEntry struct {
-	Name        string   `json:"name"`
-	Type        string   `json:"type"`
-	IsList      bool     `json:"isList"`
-	ArgRequired bool     `json:"argRequired"`
-	Display     string   `json:"display"`
-	Desc        string   `json:"desc"`
-	Properties  []string `json:"properties"`
+	Name       string        `json:"name"`
+	Type       string        `json:"type"`
+	IsList     bool          `json:"isList"`
+	Arg        FieldEntryArg `json:"arg"`
+	Display    string        `json:"display"`
+	Desc       string        `json:"desc"`
+	Properties []string      `json:"properties"`
+}
+
+// FieldEntryArg describes the argument of a single field entry that
+// an extractor plugin can expose. Should be used when implementing
+// plugin_get_fields().
+type FieldEntryArg struct {
+	IsRequired bool `json:"isRequired"`
+	IsNumeric  bool `json:"isNumeric"`
+	IsString   bool `json:"isString"`
 }
 
 // OpenParam represents a valid parameter for plugin_open().
