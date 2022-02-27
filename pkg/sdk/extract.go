@@ -28,7 +28,7 @@ import (
 
 // ExtractRequest represents an high-level abstraction that wraps a pointer to
 // a ss_plugin_extract_field C structure, providing methods for accessing its
-// fields in a go-friently way.
+// fields in a go-friendly way.
 type ExtractRequest interface {
 	// FieldID returns id of the field, as of its index in the list of fields
 	// returned by plugin_get_fields
