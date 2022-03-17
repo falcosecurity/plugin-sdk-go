@@ -41,7 +41,7 @@ import (
 const (
 	// Initial and minimum length with which the array of results is allocated
 	// for a each extractRequest struct.
-	minResultBufferLen = 10
+	minResultBufferLen = 512
 )
 
 // ExtractRequest represents an high-level abstraction that wraps a pointer to
