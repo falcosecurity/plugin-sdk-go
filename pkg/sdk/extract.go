@@ -65,6 +65,9 @@ type ExtractRequest interface {
 	// is returned if no argument is specified.
 	Arg() string
 	//
+	// IsList returns true if the field extracts lists of values.
+	IsList() bool
+	//
 	// SetValue sets the extracted value for the requested field.
 	//
 	// The underlying type of v must be compatible with the field type
@@ -153,6 +156,10 @@ func (e *extractRequest) Field() string {
 
 func (e *extractRequest) Arg() string {
 	return ptr.GoString(unsafe.Pointer(e.req.arg))
+}
+
+func (e *extractRequest) IsList() bool {
+	return bool(e.req.flist)
 }
 
 func (e *extractRequest) SetValue(v interface{}) {
