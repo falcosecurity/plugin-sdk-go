@@ -100,9 +100,9 @@ func TestExtractRequestSetValue(t *testing.T) {
 	// init extract requests
 	pool := NewExtractRequestPool()
 	u64Ptr, freeU64Ptr := allocSSPluginExtractField(1, FieldTypeUint64, "test.u64", "", false)
-	u64ListPtr, freeU64ListPtr := allocSSPluginExtractField(1, FieldTypeUint64, "test.u64", "", true)
-	strPtr, freeStrPtr := allocSSPluginExtractField(2, FieldTypeCharBuf, "test.str", "", false)
-	strListPtr, freeStrListPtr := allocSSPluginExtractField(2, FieldTypeCharBuf, "test.str", "", true)
+	u64ListPtr, freeU64ListPtr := allocSSPluginExtractField(2, FieldTypeUint64, "test.u64", "", true)
+	strPtr, freeStrPtr := allocSSPluginExtractField(3, FieldTypeCharBuf, "test.str", "", false)
+	strListPtr, freeStrListPtr := allocSSPluginExtractField(4, FieldTypeCharBuf, "test.str", "", true)
 	u64Req := pool.Get(0)
 	u64ReqList := pool.Get(1)
 	strReq := pool.Get(2)
@@ -111,6 +111,26 @@ func TestExtractRequestSetValue(t *testing.T) {
 	u64ReqList.SetPtr(unsafe.Pointer(u64ListPtr))
 	strReq.SetPtr(unsafe.Pointer(strPtr))
 	strReqList.SetPtr(unsafe.Pointer(strListPtr))
+
+	// check that info is passed-through correctly
+	if u64Req.FieldID() != 1 {
+		t.Errorf("expected value '%d', but found '%d'", 1, u64Req.FieldID())
+	}
+	if u64Req.FieldType() != FieldTypeUint64 {
+		t.Errorf("expected value '%d', but found '%d'", FieldTypeUint64, u64Req.FieldType())
+	}
+	if u64Req.Field() != "test.u64" {
+		t.Errorf("expected value '%s', but found '%s'", "test.u64", u64Req.Field())
+	}
+	if u64Req.Arg() != "" {
+		t.Errorf("expected value '%s', but found '%s'", "", u64Req.Arg())
+	}
+	if u64Req.IsList() != false {
+		t.Errorf("expected value '%t', but found '%t'", false, u64Req.IsList())
+	}
+	if strReqList.IsList() != true {
+		t.Errorf("expected value '%t', but found '%t'", true, strReqList.IsList())
+	}
 
 	// check panics
 	assertPanic(t, func() {
