@@ -24,25 +24,27 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
 )
 
-func allocSSPluginExtractField(fid, ftype uint32, fname, farg string, list bool) (*_Ctype_ss_plugin_extract_field, func()) {
+func allocSSPluginExtractField(fid, ftype uint32, fname, farg_key string, farg_index uint64, farg_present bool, list bool) (*_Ctype_ss_plugin_extract_field, func()) {
 	ret := &_Ctype_ss_plugin_extract_field{}
 	ret.field_id = _Ctype_uint32_t(fid)
 	ret.ftype = _Ctype_uint32_t(ftype)
+	ret.arg_present = _Ctype__Bool(farg_present)
 	ret.flist = _Ctype__Bool(list)
+	ret.arg_index = _Ctype_uint64_t(farg_index)
 
-	argBuf := ptr.StringBuffer{}
+	argKeyBuf := ptr.StringBuffer{}
 	fnameBuf := ptr.StringBuffer{}
 	fnameBuf.Write(fname)
 	ret.field = (*_Ctype_char)(fnameBuf.CharPtr())
-	if len(farg) > 0 {
-		argBuf.Write(farg)
-		ret.arg = (*_Ctype_char)(argBuf.CharPtr())
+	if len(farg_key) > 0 {
+		argKeyBuf.Write(farg_key)
+		ret.arg_key = (*_Ctype_char)(argKeyBuf.CharPtr())
 	} else {
-		ret.arg = nil
+		ret.arg_key = nil
 	}
 
 	return ret, func() {
-		argBuf.Free()
+		argKeyBuf.Free()
 		fnameBuf.Free()
 	}
 }
@@ -75,10 +77,11 @@ func TestNewExtractRequestPool(t *testing.T) {
 	// Access should be non-contiguous
 	for i := 0; i < 20; i += 2 {
 		req := pool.Get(i)
-		cstruct, freeCStruct := allocSSPluginExtractField(5, FieldTypeUint64, "test.field", "arg", false)
+		cstruct, freeCStruct := allocSSPluginExtractField(5, FieldTypeUint64, "test.field", "5", 5, true, false)
 		req.SetPtr(unsafe.Pointer(cstruct))
-		if req.FieldType() != FieldTypeUint64 || req.FieldID() != 5 || req.Field() != "test.field" || req.Arg() != "arg" {
-			println(req.FieldType(), ", ", req.FieldID(), ", ", req.Field(), ", ", req.Arg())
+		if req.FieldType() != FieldTypeUint64 || req.FieldID() != 5 || req.Field() != "test.field" || req.ArgKey() != "5" ||
+			req.ArgIndex() != 5 || req.ArgPresent() != true || req.IsList() != false {
+			println(req.FieldType(), ", ", req.FieldID(), ", ", req.Field(), ", ", req.ArgKey(), ", ", req.ArgIndex())
 			t.Errorf("could not read fields from sdk.ExtractRequest")
 		}
 		freeCStruct()
@@ -99,10 +102,10 @@ func TestExtractRequestSetValue(t *testing.T) {
 
 	// init extract requests
 	pool := NewExtractRequestPool()
-	u64Ptr, freeU64Ptr := allocSSPluginExtractField(1, FieldTypeUint64, "test.u64", "", false)
-	u64ListPtr, freeU64ListPtr := allocSSPluginExtractField(2, FieldTypeUint64, "test.u64", "", true)
-	strPtr, freeStrPtr := allocSSPluginExtractField(3, FieldTypeCharBuf, "test.str", "", false)
-	strListPtr, freeStrListPtr := allocSSPluginExtractField(4, FieldTypeCharBuf, "test.str", "", true)
+	u64Ptr, freeU64Ptr := allocSSPluginExtractField(1, FieldTypeUint64, "test.u64", "", 0, true, false)
+	u64ListPtr, freeU64ListPtr := allocSSPluginExtractField(2, FieldTypeUint64, "test.u64", "", 0, true, true)
+	strPtr, freeStrPtr := allocSSPluginExtractField(3, FieldTypeCharBuf, "test.str", "", 0, true, false)
+	strListPtr, freeStrListPtr := allocSSPluginExtractField(4, FieldTypeCharBuf, "test.str", "", 0, true, true)
 	u64Req := pool.Get(0)
 	u64ReqList := pool.Get(1)
 	strReq := pool.Get(2)
@@ -122,8 +125,14 @@ func TestExtractRequestSetValue(t *testing.T) {
 	if u64Req.Field() != "test.u64" {
 		t.Errorf("expected value '%s', but found '%s'", "test.u64", u64Req.Field())
 	}
-	if u64Req.Arg() != "" {
-		t.Errorf("expected value '%s', but found '%s'", "", u64Req.Arg())
+	if u64Req.ArgKey() != "" {
+		t.Errorf("expected value '%s', but found '%s'", "", u64Req.ArgKey())
+	}
+	if u64Req.ArgIndex() != 0 {
+		t.Errorf("expected value '%s', but found '%s'", "", u64Req.ArgKey())
+	}
+	if u64Req.ArgPresent() != true {
+		t.Errorf("expected value '%s', but found '%s'", "", u64Req.ArgKey())
 	}
 	if u64Req.IsList() != false {
 		t.Errorf("expected value '%t', but found '%t'", false, u64Req.IsList())

@@ -65,9 +65,9 @@ func allocSSPluginExtractField(fid, ftype uint32, fname, farg string) (*_Ctype_s
 	ret.field = (*_Ctype_char)(fnameBuf.CharPtr())
 	if len(farg) > 0 {
 		argBuf.Write(farg)
-		ret.arg = (*_Ctype_char)(argBuf.CharPtr())
+		ret.arg_key = (*_Ctype_char)(argBuf.CharPtr())
 	} else {
-		ret.arg = nil
+		ret.arg_key = nil
 	}
 
 	return ret, func() {
