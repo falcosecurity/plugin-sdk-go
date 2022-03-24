@@ -159,8 +159,10 @@ typedef struct ss_plugin_extract_field
 	// plugin API.
 	uint32_t field_id;
 	const char* field;
-	const char* arg;
-	uint32_t ftype;	
+	const char* arg_key;
+	uint64_t arg_index;
+	bool arg_present;
+	uint32_t ftype;
 	bool flist;
 } ss_plugin_extract_field;
 

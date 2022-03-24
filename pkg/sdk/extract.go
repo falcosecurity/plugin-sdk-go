@@ -61,9 +61,16 @@ type ExtractRequest interface {
 	// is requested.
 	Field() string
 	//
-	// Arg returns the argument passed for the requested field. An empty string
-	// is returned if no argument is specified.
-	Arg() string
+	// ArgKey must be used when the field arg is a generic string (like a key
+	// in a lookup operation). This field must have the `isKey` flag enabled.
+	ArgKey() string
+	//
+	// ArgIndex must be used when the field arg is an index (0<=index<=2^64-1).
+	// This field must have the `isIndex` flag enabled.
+	ArgIndex() uint64
+	//
+	// ArgPresent clearly defines when an argument is valid or not.
+	ArgPresent() bool
 	//
 	// IsList returns true if the field extracts lists of values.
 	IsList() bool
@@ -154,8 +161,16 @@ func (e *extractRequest) Field() string {
 	return ptr.GoString(unsafe.Pointer(e.req.field))
 }
 
-func (e *extractRequest) Arg() string {
-	return ptr.GoString(unsafe.Pointer(e.req.arg))
+func (e *extractRequest) ArgKey() string {
+	return ptr.GoString(unsafe.Pointer(e.req.arg_key))
+}
+
+func (e *extractRequest) ArgIndex() uint64 {
+	return uint64(e.req.arg_index)
+}
+
+func (e *extractRequest) ArgPresent() bool {
+	return bool(e.req.arg_present)
 }
 
 func (e *extractRequest) IsList() bool {
