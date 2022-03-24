@@ -77,8 +77,8 @@ type FieldEntry struct {
 // plugin_get_fields().
 type FieldEntryArg struct {
 	IsRequired bool `json:"isRequired"`
-	IsNumeric  bool `json:"isNumeric"`
-	IsString   bool `json:"isString"`
+	IsIndex    bool `json:"isIndex"`
+	IsKey      bool `json:"isKey"`
 }
 
 // OpenParam represents a valid parameter for plugin_open().
