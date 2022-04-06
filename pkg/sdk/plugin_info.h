@@ -118,12 +118,23 @@ typedef struct ss_plugin_event
 // field_id: id of the field, as of its index in the list of
 //           fields specified by the plugin.
 // field: the field name.
-// arg: the field argument, if an argument has been specified
-//      for the field, otherwise it's NULL.
-//      For example:
-//         * if the field specified by the user is foo.bar[pippo], arg will be the
-//           string "pippo"
-//         * if the field specified by the user is foo.bar, arg will be NULL
+// arg_key: the field argument, if a 'key' argument has been specified
+//          for the field (isKey=true), otherwise it's NULL.
+//          For example:
+//          * if the field specified by the user is foo.bar[pippo], arg_key 
+//            will be the string "pippo"
+//         	* if the field specified by the user is foo.bar, arg will be NULL
+// arg_index: the field argument, if a 'index' argument has been specified
+//            for the field (isIndex=true), otherwise it's 0.
+//            For example:
+//            * if the field specified by the user is foo.bar[1], arg_index 
+//            will be the uint64_t '1'. 
+//            Please note the ambiguity with a 0
+//            argument which could be a real argument of just the default 
+//            value to point out the absence. The `arg_present` field resolves
+//            this ambiguity.
+// arg_present: helps to understand if the arg is there since arg_index is
+//              0-based.
 // ftype: the type of the field. Could be derived from the field name alone,
 //   but including here can prevent a second lookup of field names.
 // flist: whether the field can extract lists of values or not.
@@ -339,16 +350,29 @@ typedef struct
 	//     "type": one of "string", "uint64"
 	//     "isList: (optional) If present and set to true, notes
 	//              that the field extracts a list of values.
-	//     "argRequired: (optional) If present and set to true, notes
+	//     "argRequired": [DEPRECATED, use "arg" property instead] 
+	//                   (optional) If present and set to true, notes
 	//                   that the field requires an argument e.g. field[arg].
+	//     "arg": (optional) if present, notes that the field can accept
+	//             an argument e.g. field[arg]. More precisely, the following
+	//             flags could be specified:
+	//             "isRequired": if true, the argument is required.
+	//             "isIndex": if true, the field is numeric. 
+	//             "isKey": if true, the field is a string.
+	//             If "isRequired" is true, one between "isIndex" and
+	//             "isKey" must be true, to specify the argument type.
+	//             If "isRequired" is false, but one between "isIndex"
+	//             and "isKey" is true, the argument is allowed but
+	//             not required.
 	//     "display": (optional) If present, a string that will be used to
 	//                display the field instead of the name. Used in tools
 	//                like wireshark.
 	//     "desc": a string with a description of the field
 	// Example return value:
 	// [
-	//    {"type": "string", "name": "field1", "argRequired": true, "desc": "Describing field 1"},
-	//    {"type": "uint64", "name": "field2", "desc": "Describing field 2"}
+	//    {"type": "string", "name": "field1", "argRequired": true, "desc": "Describing field 1"}, [DEPRECATED 'argRequired' property]
+	//    {"type": "uint64", "name": "field2", "desc": "Describing field 2"},
+	//    {"type": "string", "name": "field3", "arg": {"isRequired": true, "isIndex": true,}, "desc": "Describing field 3"},
 	// ]
 	const char* (*get_fields)();
 	//
