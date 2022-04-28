@@ -39,16 +39,6 @@ func TestInfo(t *testing.T) {
 		t.Errorf("(id) expected %d, but found %d", testU32, resU32)
 	}
 
-	SetType(testU32)
-	resU32 = plugin_get_type()
-	if resU32 != testU32 {
-		t.Errorf("(type) expected %d, but found %d", testU32, resU32)
-	}
-	resU32 = Type()
-	if resU32 != testU32 {
-		t.Errorf("(type) expected %d, but found %d", testU32, resU32)
-	}
-
 	SetName(testStr)
 	resStr = ptr.GoString(unsafe.Pointer(plugin_get_name()))
 	if resStr != testStr {

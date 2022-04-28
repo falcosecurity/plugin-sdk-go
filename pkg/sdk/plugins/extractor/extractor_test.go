@@ -22,7 +22,6 @@ import (
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins"
-	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/info"
 )
 
 type testPlugin struct {
@@ -68,28 +67,4 @@ func assertPanic(t *testing.T, fun func()) {
 		}
 	}()
 	fun()
-}
-
-func TestRegister(t *testing.T) {
-	registerFunc := func() {
-		Register(&testPlugin{})
-	}
-	registerFunc()
-	if info.Type() != sdk.TypeExtractorPlugin {
-		t.Errorf("plugin type should be extractor")
-	}
-	assertPanic(t, registerFunc)
-
-	// With source plugin type
-	registered = false
-	info.SetType(sdk.TypeSourcePlugin)
-	Register(&testPlugin{})
-	if info.Type() != sdk.TypeSourcePlugin {
-		t.Errorf("plugin type should be source")
-	}
-
-	// With unknown plugin type
-	registered = false
-	info.SetType(3)
-	assertPanic(t, registerFunc)
 }

@@ -39,12 +39,6 @@ const (
 	SSPluginNotSupported int32 = 3
 )
 
-// One of these values should be returned by plugin_get_type().
-const (
-	TypeSourcePlugin    uint32 = 1
-	TypeExtractorPlugin uint32 = 2
-)
-
 // DefaultEvtSize is the default size for the data payload allocated
 // for each event in the EventWriters interface used by the SDK.
 const DefaultEvtSize uint32 = 256 * 1024
@@ -60,8 +54,9 @@ const (
 	FieldTypeCharBuf uint32 = 9 // A printable buffer of bytes, NULL terminated
 )
 
-// FieldEntry represents a single field entry that an extractor plugin
-// can expose. Should be used when implementing plugin_get_fields().
+// FieldEntry represents a single field entry that a plugin with extraction
+// capabilities can expose.
+// Should be used when implementing plugin_get_fields().
 type FieldEntry struct {
 	Name       string        `json:"name"`
 	Type       string        `json:"type"`
@@ -73,8 +68,8 @@ type FieldEntry struct {
 }
 
 // FieldEntryArg describes the argument of a single field entry that
-// an extractor plugin can expose. Should be used when implementing
-// plugin_get_fields().
+// an plugin with extraction capabilities can expose.
+// Should be used when implementing plugin_get_fields().
 type FieldEntryArg struct {
 	IsRequired bool `json:"isRequired"`
 	IsIndex    bool `json:"isIndex"`

@@ -89,20 +89,12 @@ type BaseInstance struct {
 // needs to be called in a Go init() function. Calling this function more than
 // once will cause a panic.
 //
-// Register registers a source plugin in the SDK. In order to
-// register a source plugin with optional extraction capabilities, the
-// extractor.Register function must be called by passing the same Plugin
-// argument. In this case, the order in which Register and extractor.Register
-// are called in the init() function is not relevant. This is needed for the
-// framework to notice that the source plugin implements the extraction-related
-// methods.
 func Register(p Plugin) {
 	if registered {
 		panic("plugin-sdk-go/sdk/plugins/source: register can be called only once")
 	}
 
 	i := p.Info()
-	info.SetType(sdk.TypeSourcePlugin)
 	info.SetId(i.ID)
 	info.SetName(i.Name)
 	info.SetDescription(i.Description)
