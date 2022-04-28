@@ -47,26 +47,11 @@ type Plugin interface {
 // needs to be called in a Go init() function. Calling this function more than
 // once will cause a panic.
 //
-// Register can also be called to register source plugins with optional
-// extraction capabilities. If this function is called before, or after, having
-// registered a source plugin in the SDK, the registered plugin will be a
-// plugin of type sdk.TypeSourcePlugin with extraction capabilities enabled.
 func Register(p Plugin) {
 	if registered {
 		panic("plugin-sdk-go/sdk/plugins/extractor: register can be called only once")
 	}
 
-	// Currently TypeExtractorPlugin is also compatible with source plugins
-	// that export extract-related symbols.
-	switch info.Type() {
-	case 0:
-		info.SetType(sdk.TypeExtractorPlugin)
-	case sdk.TypeExtractorPlugin:
-	case sdk.TypeSourcePlugin: // source plugins have the priority over extractor plugins
-		break
-	default:
-		panic("plugin-sdk-go/sdk/plugins/extractor: unsupported type has already been set")
-	}
 	i := p.Info()
 	info.SetId(i.ID)
 	info.SetName(i.Name)

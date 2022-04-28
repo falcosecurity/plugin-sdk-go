@@ -52,19 +52,6 @@ var (
 	pExtractEventSources ptr.StringBuffer
 )
 
-//export plugin_get_type
-func plugin_get_type() uint32 {
-	return pType
-}
-
-func SetType(t uint32) {
-	pType = t
-}
-
-func Type() uint32 {
-	return pType
-}
-
 //export plugin_get_id
 func plugin_get_id() uint32 {
 	return pId

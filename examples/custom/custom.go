@@ -95,11 +95,10 @@ func init() {
 	// its type (source or extractor).
 	info.SetId(999)
 	info.SetName("custom-example")
-	info.SetDescription("A Source Plugin Example")
+	info.SetDescription("A Plugin Example")
 	info.SetContact("github.com/falcosecurity/plugin-sdk-go")
 	info.SetVersion("0.1.0")
 	info.SetRequiredAPIVersion("0.2.0")
-	info.SetType(sdk.TypeSourcePlugin)
 	info.SetEventSource("example")
 
 	// Define an initialization callback
