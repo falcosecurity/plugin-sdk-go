@@ -19,9 +19,9 @@ package evtstr
 import (
 	"bytes"
 	"errors"
-	"io"
 	"io/ioutil"
 	"testing"
+	"time"
 	"unsafe"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/cgo"
@@ -39,15 +39,27 @@ type sampleEvtStr struct {
 	expectedData []byte
 }
 
+func allocSSPluginEvent(num, ts uint64, data []byte) (*_Ctype_struct_ss_plugin_event, func()) {
+	ret := &_Ctype_struct_ss_plugin_event{}
+	ret.evtnum = _Ctype_uint64_t(num)
+	ret.ts = _Ctype_uint64_t(ts)
+	ret.data = (*_Ctype_uint8_t)(&data[0])
+	ret.datalen = _Ctype_uint32_t(len(data))
+
+	return ret, func() {
+		// nothing to deallocate here
+	}
+}
+
 func (s *sampleEvtStr) StringerBuffer() sdk.StringBuffer {
 	return &s.strBuf
 }
 
-func (s *sampleEvtStr) String(in io.ReadSeeker) (string, error) {
+func (s *sampleEvtStr) String(evt sdk.EventReader) (string, error) {
 	if s.shouldError {
 		return "", errTest
 	}
-	data, err := ioutil.ReadAll(in)
+	data, err := ioutil.ReadAll(evt.Reader())
 	if err != nil {
 		return "", err
 	}
@@ -68,7 +80,9 @@ func TestEvtStr(t *testing.T) {
 	sample.expectedData = data
 
 	// test success
-	cStr := plugin_event_to_string(_Ctype_uintptr_t(handle), (*_Ctype_uint8_t)(&data[0]), uint32(len(data)))
+	event, freeEvent := allocSSPluginEvent(1, uint64(time.Now().UnixNano()), data)
+	defer freeEvent()
+	cStr := plugin_event_to_string(_Ctype_uintptr_t(handle), event)
 	str := ptr.GoString(unsafe.Pointer(cStr))
 	if str != strSuccess {
 		t.Errorf("expected %s, but found %s", strSuccess, str)
@@ -76,7 +90,7 @@ func TestEvtStr(t *testing.T) {
 
 	// test forced error
 	sample.shouldError = true
-	cStr = plugin_event_to_string(_Ctype_uintptr_t(handle), (*_Ctype_uint8_t)(&data[0]), uint32(len(data)))
+	cStr = plugin_event_to_string(_Ctype_uintptr_t(handle), event)
 	str = ptr.GoString(unsafe.Pointer(cStr))
 	if str != errTest.Error() {
 		t.Errorf("expected %s, but found %s", strSuccess, str)
