@@ -28,7 +28,6 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/alecthomas/jsonschema"
@@ -204,9 +203,9 @@ func (m *MyPlugin) Open(params string) (source.Instance, error) {
 // String produces a string representation of an event data produced by the
 // event source of this plugin.
 // This method is optional for the event sourcing capability.
-func (m *MyPlugin) String(in io.ReadSeeker) (string, error) {
+func (m *MyPlugin) String(evt sdk.EventReader) (string, error) {
 	var value uint64
-	encoder := gob.NewDecoder(in)
+	encoder := gob.NewDecoder(evt.Reader())
 	if err := encoder.Decode(&value); err != nil {
 		return "", err
 	}
