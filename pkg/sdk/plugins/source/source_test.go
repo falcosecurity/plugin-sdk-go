@@ -17,7 +17,6 @@ limitations under the License.
 package source
 
 import (
-	"io"
 	"testing"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
@@ -52,7 +51,7 @@ func (m *testPlugin) Open(params string) (Instance, error) {
 	return &testInstance{}, nil
 }
 
-func (m *testPlugin) String(in io.ReadSeeker) (string, error) {
+func (m *testPlugin) String(evt sdk.EventReader) (string, error) {
 	return "", nil
 }
 

@@ -37,10 +37,10 @@ var registered = false
 // Plugin is an interface representing a plugin with event sourcing capability
 type Plugin interface {
 	plugins.Plugin
-	sdk.Stringer
 	sdk.StringerBuffer
 	sdk.OpenParamsBuffer
 	// (optional) sdk.OpenParams
+	// (optional) sdk.Stringer
 
 	//
 	// Open opens the source and starts a capture (e.g. stream of events).
@@ -102,7 +102,6 @@ func Register(p Plugin) {
 	info.SetContact(i.Contact)
 	info.SetVersion(i.Version)
 	info.SetRequiredAPIVersion(i.RequiredAPIVersion)
-	info.SetExtractEventSources(i.ExtractEventSources)
 	if initSchema, ok := p.(sdk.InitSchema); ok {
 		initschema.SetInitSchema(initSchema.InitSchema())
 	}

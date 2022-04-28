@@ -56,7 +56,6 @@ func Register(p Plugin) {
 	info.SetId(i.ID)
 	info.SetName(i.Name)
 	info.SetDescription(i.Description)
-	info.SetEventSource(i.EventSource)
 	info.SetContact(i.Contact)
 	info.SetVersion(i.Version)
 	info.SetRequiredAPIVersion(i.RequiredAPIVersion)
