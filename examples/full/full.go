@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This plugin is a simple example of source plugin with the optional
-// extraction capabilities.
+// This plugin is a simple example of plugin with both event sourcing and
+// field extraction capabilities.
 // The plugin produces events of the "example" data source containing
 // a single uint64 representing the incrementing value of a counter,
 // serialized using a encoding/gob encoder. The plugin is capable of
@@ -74,9 +74,9 @@ type MyInstance struct {
 
 // The plugin must be registered to the SDK in the init() function.
 // Registering the plugin using both source.Register and extractor.Register
-// declares to the SDK a source plugin with the optional extraction features
+// declares to the SDK a plugin with both sourcing and extraction features
 // enabled. The order in which the two Register functions are called is not
-// relevant, as the SDK induces that the registered plugin is a source plugin.
+// relevant.
 // This requires our plugin to implement the source.Plugin interface, so
 // compilation will fail if the mandatory methods are not implemented.
 func init() {
@@ -87,7 +87,7 @@ func init() {
 
 // Info returns a pointer to a plugin.Info struct, containing all the
 // general information about this plugin.
-// This method is mandatory for source plugins.
+// This method is mandatory.
 func (m *MyPlugin) Info() *plugins.Info {
 	return &plugins.Info{
 		ID:          999,
@@ -106,7 +106,7 @@ func (m *MyPlugin) Info() *plugins.Info {
 // plugin can assume that it to be always be well-formed when passed to Init().
 // This is ignored if the return value is nil. The returned schema must follow
 // the JSON Schema specific. See: https://json-schema.org/
-// This method is optional for source plugins.
+// This method is optional.
 func (m *MyPlugin) InitSchema() *sdk.SchemaInfo {
 	// We leverage the jsonschema package to autogenerate the
 	// JSON Schema definition using reflection from our config struct.
@@ -123,7 +123,7 @@ func (m *MyPlugin) InitSchema() *sdk.SchemaInfo {
 // Since this plugin defines the InitSchema() method, we can assume
 // that the configuration is pre-validated by the framework and
 // always well-formed according to the provided schema.
-// This method is mandatory for source plugins.
+// This method is mandatory.
 func (m *MyPlugin) Init(config string) error {
 	// Deserialize the config json. Ignoring the error
 	// and not validating the config values is possible
@@ -134,9 +134,9 @@ func (m *MyPlugin) Init(config string) error {
 }
 
 // Fields return the list of extractor fields exported by this plugin.
-// This method is optional for source plugins, and enables the extraction
-// capabilities. If the Fields method is defined, the framework expects
-// an Extract method to be specified too.
+// This method is mandatory the field extraction capability.
+// If the Fields method is defined, the framework expects an Extract method
+// to be specified too.
 func (m *MyPlugin) Fields() []sdk.FieldEntry {
 	return []sdk.FieldEntry{
 		{Type: "uint64", Name: "example.count", Display: "Counter value", Desc: "Current value of the internal counter"},
@@ -144,9 +144,9 @@ func (m *MyPlugin) Fields() []sdk.FieldEntry {
 	}
 }
 
-// This method is optional for source plugins, and enables the extraction
-// capabilities. If the Extract method is defined, the framework expects
-// an Fields method to be specified too.
+// This method is mandatory the field extraction capability.
+// If the Extract method is defined, the framework expects an Fields method
+// to be specified too.
 func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 	var value uint64
 	encoder := gob.NewDecoder(evt.Reader())
@@ -167,7 +167,8 @@ func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 }
 
 // OpenParams returns a list of suggested parameters that would be accepted
-// as valid arguments to Open(). This method is optional for source plugins.
+// as valid arguments to Open().
+// This method is optional for the event sourcing capability.
 func (m *MyPlugin) OpenParams() ([]sdk.OpenParam, error) {
 	return []sdk.OpenParam{
 		{
@@ -179,7 +180,7 @@ func (m *MyPlugin) OpenParams() ([]sdk.OpenParam, error) {
 
 // Open opens the plugin source and starts a new capture session (e.g. stream
 // of events), creating a new plugin instance. The state of each instance can
-// be initialized here. This method is mandatory for source plugins.
+// be initialized here. This method is mandatory for the event sourcing capability.
 func (m *MyPlugin) Open(params string) (source.Instance, error) {
 	// An event batch buffer can optionally be defined to specify custom
 	// values for max data size or max batch size. If nothing is set
@@ -201,7 +202,8 @@ func (m *MyPlugin) Open(params string) (source.Instance, error) {
 }
 
 // String produces a string representation of an event data produced by the
-// event source of this plugin. This method is mandatory for source plugins.
+// event source of this plugin.
+// This method is optional for the event sourcing capability.
 func (m *MyPlugin) String(in io.ReadSeeker) (string, error) {
 	var value uint64
 	encoder := gob.NewDecoder(in)
@@ -212,7 +214,8 @@ func (m *MyPlugin) String(in io.ReadSeeker) (string, error) {
 }
 
 // NextBatch produces a batch of new events, and is called repeatedly by the
-// framework. For source plugins, it's mandatory to specify a NextBatch method.
+// framework. For plugins with event sourcing capability, it's mandatory to
+// specify a NextBatch method.
 // The batch has a maximum size that dependes on the size of the underlying
 // reusable memory buffer. A batch can be smaller than the maximum size.
 func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (int, error) {
@@ -232,21 +235,21 @@ func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (i
 
 // Progress returns a percentage indicator referring to the production progress
 // of the event source of this plugin.
-// This method is optional for source plugins.
+// This method is optional for the event sourcing capability.
 // func (m *MyInstance) Progress(pState sdk.PluginState) (float64, string) {
 //
 // }
 
 // Close is gets called by the SDK when the plugin source capture gets closed.
 // This is useful to release any open resource used by each plugin instance.
-// This method is optional for source plugins.
+// This method is optional for the event sourcing capability.
 // func (m *MyInstance) Close() {
 //
 // }
 
 // Destroy is gets called by the SDK when the plugin gets deinitialized.
 // This is useful to release any open resource used by the plugin.
-// This method is optional for source plugins.
+// This method is optional.
 // func (m *MyPlugin) Destroy() {
 //
 // }

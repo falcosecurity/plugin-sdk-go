@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This plugin is a simple example of source plugin.
+// This plugin is a simple example of plugin with event sourcing capability.
 // The plugin produces events of the "example" data source containing
 // a single uint64 representing the incrementing value of a counter,
 // serialized using a encoding/gob encoder.
@@ -70,7 +70,7 @@ func init() {
 
 // Info returns a pointer to a plugin.Info struct, containing all the
 // general information about this plugin.
-// This method is mandatory for source plugins.
+// This method is mandatory.
 func (m *MyPlugin) Info() *plugins.Info {
 	return &plugins.Info{
 		ID:          999,
@@ -83,7 +83,7 @@ func (m *MyPlugin) Info() *plugins.Info {
 }
 
 // Init initializes this plugin with a given config string, which is unused
-// in this example. This method is mandatory for source plugins.
+// in this example. This method is mandatory.
 func (m *MyPlugin) Init(config string) error {
 	m.config = config
 	return nil
@@ -91,7 +91,7 @@ func (m *MyPlugin) Init(config string) error {
 
 // Open opens the plugin source and starts a new capture session (e.g. stream
 // of events), creating a new plugin instance. The state of each instance can
-// be initialized here. This method is mandatory for source plugins.
+// be initialized here. This method is mandatory for the event sourcing capability.
 func (m *MyPlugin) Open(params string) (source.Instance, error) {
 	return &MyInstance{
 		counter: 0,
@@ -99,7 +99,8 @@ func (m *MyPlugin) Open(params string) (source.Instance, error) {
 }
 
 // String produces a string representation of an event data produced by the
-// event source of this plugin. This method is mandatory for source plugins.
+// event source of this plugin.
+// This method is optional for the event sourcing capability.
 func (m *MyPlugin) String(in io.ReadSeeker) (string, error) {
 	var value uint64
 	encoder := gob.NewDecoder(in)
@@ -110,7 +111,8 @@ func (m *MyPlugin) String(in io.ReadSeeker) (string, error) {
 }
 
 // NextBatch produces a batch of new events, and is called repeatedly by the
-// framework. For source plugins, it's mandatory to specify a NextBatch method.
+// framework. For plugins with event sourcing capability, it's mandatory to
+// specify a NextBatch method.
 // The batch has a maximum size that dependes on the size of the underlying
 // reusable memory buffer. A batch can be smaller than the maximum size.
 func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (int, error) {
@@ -127,21 +129,21 @@ func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (i
 
 // Progress returns a percentage indicator referring to the production progress
 // of the event source of this plugin.
-// This method is optional for source plugins.
+// This method is optional for the event sourcing capability.
 // func (m *MyInstance) Progress(pState sdk.PluginState) (float64, string) {
 //
 // }
 
 // Close is gets called by the SDK when the plugin source capture gets closed.
 // This is useful to release any open resource used by each plugin instance.
-// This method is optional for source plugins.
+// This method is optional for the event sourcing capability.
 // func (m *MyInstance) Close() {
 //
 // }
 
 // Destroy is gets called by the SDK when the plugin gets deinitialized.
 // This is useful to release any open resource used by the plugin.
-// This method is optional for source plugins.
+// This method is optional.
 // func (m *MyPlugin) Destroy() {
 //
 // }
@@ -153,7 +155,7 @@ func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (i
 // plugin can assume that it to be always be well-formed when passed to Init().
 // This is ignored if the return value is nil. The returned schema must follow
 // the JSON Schema specific. See: https://json-schema.org/
-// This method is optional for extractor plugins.
+// This method is optional.
 // func (m *MyPlugin) InitSchema() *sdk.SchemaInfo {
 //
 // }

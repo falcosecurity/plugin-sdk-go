@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This plugin is a simple example of extractor plugin.
+// This plugin is a simple example of plugin with field extraction capability.
 // The plugin extracts the "example.ts" field from the "example" event source,
 // which simply represents the timestamp of the extraction.
 package main
@@ -50,7 +50,7 @@ func init() {
 
 // Info returns a pointer to a plugin.Info struct, containing all the
 // general information about this plugin.
-// This method is mandatory for extractor plugins.
+// This method is mandatory.
 func (m *MyPlugin) Info() *plugins.Info {
 	return &plugins.Info{
 		ID:                  999,
@@ -63,13 +63,13 @@ func (m *MyPlugin) Info() *plugins.Info {
 }
 
 // Init initializes this plugin with a given config string, which is unused
-// in this example. This method is mandatory for extractor plugins.
+// in this example. This method is mandatory.
 func (m *MyPlugin) Init(config string) error {
 	return nil
 }
 
 // Fields return the list of extractor fields exported by this plugin.
-// This method is mandatory for extractor plugins.
+// This method is mandatory for the field extraction capability.
 func (m *MyPlugin) Fields() []sdk.FieldEntry {
 	return []sdk.FieldEntry{
 		{Type: "uint64", Name: "example.ts", Display: "Current Timestamp", Desc: "The current timestamp"},
@@ -77,7 +77,7 @@ func (m *MyPlugin) Fields() []sdk.FieldEntry {
 }
 
 // Extract extracts the value of a single field from a given event data.
-// This method is mandatory for extractor plugins.
+// This method is mandatory for the field extraction capability.
 func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 	switch req.FieldID() {
 	case 0:
@@ -90,7 +90,7 @@ func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 
 // Destroy is gets called by the SDK when the plugin gets deinitialized.
 // This is useful to release any open resource used by the plugin.
-// This method is optional for extractor plugins.
+// This method is optional.
 // func (m *MyPlugin) Destroy() {
 //
 // }
@@ -102,7 +102,7 @@ func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 // plugin can assume that it to be always be well-formed when passed to Init().
 // This is ignored if the return value is nil. The returned schema must follow
 // the JSON Schema specific. See: https://json-schema.org/
-// This method is optional for extractor plugins.
+// This method is optional.
 // func (m *MyPlugin) InitSchema() *sdk.SchemaInfo {
 //
 // }
