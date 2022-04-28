@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This plugin is an advanced example of source plugin with the optional
-// extraction capabilities. Unlike the other examples, this does not make use
+// This plugin is an advanced example of both event sourcing and field extraction
+// capabilities. Unlike the other examples, this does not make use
 // on the high-level constructs of the sdk/plugins package, but instead
 // it directly uses the low-level sdk/symbols packages. This approach is
 // more complex and generally discouraged, but it can be useful in case a
@@ -164,9 +164,8 @@ func plugin_event_to_string(pState C.uintptr_t, data *C.uint8_t, datalen uint32)
 	return (*C.char)(buffer.CharPtr())
 }
 
-// This method is optional for source plugins, and enables the extraction
-// capabilities. This is required and called by the prebuilt
-// plugin_extract_fields C symbol.
+// This method is mandatory for the field extraction capability.
+// This is required and called by the prebuilt plugin_extract_fields C symbol.
 func (p *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 	bytes, err := ioutil.ReadAll(evt.Reader())
 	if err != nil {
@@ -225,7 +224,7 @@ func (i *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (i
 // plugin can assume that it to be always be well-formed when passed to Init().
 // This is ignored if the return value is nil. The returned schema must follow
 // the JSON Schema specific. See: https://json-schema.org/
-// This method is optional for extractor plugins.
+// This method is optional.
 // func (m *MyPlugin) InitSchema() *sdk.SchemaInfo {
 //
 // }

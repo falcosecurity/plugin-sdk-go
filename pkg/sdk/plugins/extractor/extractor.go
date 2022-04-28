@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package extractor provides high-level constructs to easily build
-// extractor plugins.
+// plugins with field extraction capability.
 package extractor
 
 import (
@@ -33,7 +33,7 @@ import (
 
 var registered = false
 
-// Plugin is an interface representing an extractor plugin.
+// Plugin is an interface representing a plugin with field extraction capability.
 type Plugin interface {
 	plugins.Plugin
 	sdk.Extractor
@@ -43,7 +43,7 @@ type Plugin interface {
 	Fields() []sdk.FieldEntry
 }
 
-// Register registers a Plugin extractor plugin in the framework. This function
+// Register registers a Plugin in the framework. This function
 // needs to be called in a Go init() function. Calling this function more than
 // once will cause a panic.
 //

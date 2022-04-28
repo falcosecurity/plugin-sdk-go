@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package source provides high-level constructs to easily build
-// source plugins.
+// plugins with event sourcing capability.
 package source
 
 import (
@@ -34,7 +34,7 @@ import (
 
 var registered = false
 
-// Plugin is an interface representing a source plugin.
+// Plugin is an interface representing a plugin with event sourcing capability
 type Plugin interface {
 	plugins.Plugin
 	sdk.Stringer
@@ -63,7 +63,7 @@ type Plugin interface {
 }
 
 // Instance is an interface representing a source capture session instance
-// returned by a call to Open of a source plugin.
+// returned by a call to Open of a plugin with event sourcing capability.
 //
 // Implementations of this interface must implement sdk.NextBatcher, and can
 // optionally implement sdk.Closer and sdk.Progresser.
@@ -85,7 +85,7 @@ type BaseInstance struct {
 	plugins.BaseProgress
 }
 
-// Register registers a Plugin source plugin in the framework. This function
+// Register registers a Plugin in the framework. This function
 // needs to be called in a Go init() function. Calling this function more than
 // once will cause a panic.
 //

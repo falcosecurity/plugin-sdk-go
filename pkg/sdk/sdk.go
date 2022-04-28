@@ -54,8 +54,8 @@ const (
 	FieldTypeCharBuf uint32 = 9 // A printable buffer of bytes, NULL terminated
 )
 
-// FieldEntry represents a single field entry that a plugin with extraction
-// capabilities can expose.
+// FieldEntry represents a single field entry that a plugin with field extraction
+// capability can expose.
 // Should be used when implementing plugin_get_fields().
 type FieldEntry struct {
 	Name       string        `json:"name"`
@@ -68,7 +68,7 @@ type FieldEntry struct {
 }
 
 // FieldEntryArg describes the argument of a single field entry that
-// an plugin with extraction capabilities can expose.
+// an plugin with field extraction capability can expose.
 // Should be used when implementing plugin_get_fields().
 type FieldEntryArg struct {
 	IsRequired bool `json:"isRequired"`

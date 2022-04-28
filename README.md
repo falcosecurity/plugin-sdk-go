@@ -17,15 +17,15 @@ This SDK facilitates writing [plugins](https://falco.org/docs/plugins) for [Falc
 Before using this SDK, review the [developer's guide](https://falco.org/docs/plugins/developers_guide/) which fully documents the API and provides best practices for writing plugins. The developer's guide includes a [walkthrough](https://falco.org/docs/plugins/developers_guide/#example-go-plugin-dummy) of a plugin written in Go that uses this package.
 
 For a quick start, you can refer to the provided examples:
- - [extractor plugin](https://github.com/falcosecurity/plugin-sdk-go/tree/main/examples/extractor) 
- - [source plugin](https://github.com/falcosecurity/plugin-sdk-go/tree/main/examples/source)
- - [source plugin with extraction](https://github.com/falcosecurity/plugin-sdk-go/tree/main/examples/full)
+ - [plugin with field extraction](https://github.com/falcosecurity/plugin-sdk-go/tree/main/examples/extractor) 
+ - [plugin with event sourcing](https://github.com/falcosecurity/plugin-sdk-go/tree/main/examples/source)
+ - [plugin with both event sourcing and field extraction](https://github.com/falcosecurity/plugin-sdk-go/tree/main/examples/full)
 
 
 
 ## What's next
 
-When ready to release your plugin, make sure to register the plugin with the Falcosecurity organization by creating a PR to the [falcosecurity/plugins](https://github.com/falcosecurity/plugins) respository with details on the new plugin. This ensures that a given ID is used by exactly one source plugin, and allows source plugin authors and extractor plugin authors to coordinate about event source formats.
+When ready to release your plugin, make sure to register the plugin with the Falcosecurity organization by creating a PR to the [falcosecurity/plugins](https://github.com/falcosecurity/plugins) respository with details on the new plugin. This ensures that a given ID is used by exactly one plugin with event sourcing capability, and allows authors of plugins with field extraction capability to coordinate about event source formats.
 
 ## Join the Community
 
