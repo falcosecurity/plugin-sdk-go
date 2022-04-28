@@ -38,14 +38,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"time"
-	"unsafe"
 
 	// Each one of these imported package provide a SDK prebuilt implementation
 	// of some exported C symbols needed by the framework. The _ notation near
 	// some inputs is necessary to avoid Go linters to remove the package if
 	// unused.
 	"github.com/falcosecurity/plugin-sdk-go/pkg/cgo"
-	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins"
 	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/extract"
@@ -98,7 +96,6 @@ func init() {
 	info.SetDescription("A Plugin Example")
 	info.SetContact("github.com/falcosecurity/plugin-sdk-go")
 	info.SetVersion("0.1.0")
-	info.SetRequiredAPIVersion("0.2.0")
 	info.SetEventSource("example")
 
 	// Define an initialization callback
@@ -134,7 +131,7 @@ func OnOpen(params string) (sdk.InstanceState, error) {
 // with the other SDk prebuilt symbols system.
 //
 //export plugin_event_to_string
-func plugin_event_to_string(pState C.uintptr_t, data *C.uint8_t, datalen uint32) *C.char {
+func plugin_event_to_string(pState C.uintptr_t, evt C.uintptr_t) *C.char {
 	// The prebuilt SDK symbols store the plugin state as a handle of the
 	// SDK cgo.Handle. As such, using it is required to be compliant with the
 	// other imported prebuilt symbols.
@@ -143,21 +140,9 @@ func plugin_event_to_string(pState C.uintptr_t, data *C.uint8_t, datalen uint32)
 	// Our plugin state has a reusable buffer for the event_to_string method
 	buffer := pHandle.Value().(sdk.StringerBuffer).StringerBuffer()
 
-	// We use ptr.BytesReadWriter to safely accessing C-allocated memory
-	bytesReader, err := ptr.NewBytesReadWriter(unsafe.Pointer(data), int64(datalen), int64(datalen))
-	if err != nil {
-		buffer.Write(err.Error())
-	} else {
-		// Read the string written in the event data using io funtions
-		bytes, err := ioutil.ReadAll(bytesReader)
-		if err != nil {
-			buffer.Write(err.Error())
-		} else {
-			// Set the string as return value by writing it in the
-			// reusable buffer
-			buffer.Write(string(bytes))
-		}
-	}
+	// Set the string as return value by writing it in the
+	// reusable buffer
+	buffer.Write("test")
 
 	// Extract a char* pointer from the reusable buffer and use it as
 	// the return value.
