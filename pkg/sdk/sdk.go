@@ -78,8 +78,9 @@ type FieldEntryArg struct {
 
 // OpenParam represents a valid parameter for plugin_open().
 type OpenParam struct {
-	Value string `json:"value"`
-	Desc  string `json:"desc"`
+	Value     string `json:"value"`
+	Desc      string `json:"desc"`
+	Separator string `json:"separator"`
 }
 
 // SchemaInfo represent a schema describing a structured data type.
