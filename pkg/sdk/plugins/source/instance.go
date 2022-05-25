@@ -100,49 +100,6 @@ func WithInstanceClose(close func()) func(*builtinInstance) {
 	}
 }
 
-func (s *pullInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (n int, err error) {
-	// once EOF has been hit, we should return it at each new call of NextBatch
-	if s.eof {
-		return 0, sdk.ErrEOF
-	}
-
-	// timeout needs to be resetted for this batch
-	s.timeoutTicker.Reset(s.timeout)
-
-	// attempt filling the event batch
-	n = 0
-	for n < evts.Len() {
-		// check if we should return before pulling another event
-		select {
-		// timeout hits, so we flush a partial batch
-		case <-s.timeoutTicker.C:
-			return n, sdk.ErrTimeout
-		// context has been canceled, so we exit
-		case <-s.ctx.Done():
-			s.eof = true
-			return n, sdk.ErrEOF
-		default:
-		}
-
-		// pull a new event
-		if err = s.pull(s.ctx, pState, evts.Get(n)); err != nil {
-			return
-		}
-		n++
-	}
-
-	// return a full batch
-	return n, nil
-}
-
-func (s *pullInstance) Close() {
-	// this cancels the context and calls the optional callback
-	s.shutdown()
-
-	// stop timeout ticker
-	s.timeoutTicker.Stop()
-}
-
 // NewPullInstance opens a new event source and starts a capture session,
 // filling the event batches with a pull model.
 //
@@ -192,6 +149,94 @@ func OpenPullInstance(pull PullFunc, options ...func(*builtinInstance)) (Instanc
 	}
 
 	// return opened instance
+	return res, nil
+}
+
+func (s *pullInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (n int, err error) {
+	// once EOF has been hit, we should return it at each new call of NextBatch
+	if s.eof {
+		return 0, sdk.ErrEOF
+	}
+
+	// timeout needs to be resetted for this batch
+	s.timeoutTicker.Reset(s.timeout)
+
+	// attempt filling the event batch
+	n = 0
+	for n < evts.Len() {
+		// check if we should return before pulling another event
+		select {
+		// timeout hits, so we flush a partial batch
+		case <-s.timeoutTicker.C:
+			return n, sdk.ErrTimeout
+		// context has been canceled, so we exit
+		case <-s.ctx.Done():
+			s.eof = true
+			return n, sdk.ErrEOF
+		default:
+		}
+
+		// pull a new event
+		if err = s.pull(s.ctx, pState, evts.Get(n)); err != nil {
+			return
+		}
+		n++
+	}
+
+	// return a full batch
+	return n, nil
+}
+
+func (s *pullInstance) Close() {
+	// this cancels the context and calls the optional callback
+	s.shutdown()
+
+	// stop timeout ticker
+	s.timeoutTicker.Stop()
+}
+
+// OpenPushInstance opens a new event source and starts a capture session,
+// filling the event batches with a push model.
+//
+// In this model, events are produced through a channel in the form of
+// source.PushEvent messages. This is suitable for cases in which event
+// production is suspensive, meaning that the time elapsed waiting for a
+// new event to be produced is not deterministic or has no guaranteed limit.
+//
+// Users can pass option parameters to influence the behavior of the opened
+// event source, such as passing a context or setting a custom timeout duration.
+//
+// The opened event source can be manually closed by cancelling the optional
+// passed-in context, by closing the event cannel, or by sending
+// source.PushEvent containing a non-nil Err.
+func OpenPushInstance(evtC <-chan PushEvent, options ...func(*builtinInstance)) (Instance, error) {
+	res := &pushInstance{
+		eof:  false,
+		evtC: evtC,
+		builtinInstance: builtinInstance{
+			ctx:      context.Background(),
+			timeout:  defaultInstanceTimeout,
+			shutdown: func() {},
+		},
+	}
+
+	// apply options
+	for _, opt := range options {
+		opt(&res.builtinInstance)
+	}
+
+	// init timer
+	res.timeoutTicker = time.NewTicker(res.timeout)
+
+	// setup internally-cancellable context
+	prevCancel := res.shutdown
+	cancelableCtx, cancelCtx := context.WithCancel(res.ctx)
+	res.ctx = cancelableCtx
+	res.shutdown = func() {
+		cancelCtx()
+		prevCancel()
+	}
+
 	return res, nil
 }
 
@@ -250,49 +295,4 @@ func (s *pushInstance) Close() {
 
 	// stop timeout ticker
 	s.timeoutTicker.Stop()
-}
-
-// OpenPushInstance opens a new event source and starts a capture session,
-// filling the event batches with a push model.
-//
-// In this model, events are produced through a channel in the form of
-// source.PushEvent messages. This is suitable for cases in which event
-// production is suspensive, meaning that the time elapsed waiting for a
-// new event to be produced is not deterministic or has no guaranteed limit.
-//
-// Users can pass option parameters to influence the behavior of the opened
-// event source, such as passing a context or setting a custom timeout duration.
-//
-// The opened event source can be manually closed by cancelling the optional
-// passed-in context, by closing the event cannel, or by sending
-// source.PushEvent containing a non-nil Err.
-func OpenPushInstance(evtC <-chan PushEvent, options ...func(*builtinInstance)) (Instance, error) {
-	res := &pushInstance{
-		eof:  false,
-		evtC: evtC,
-		builtinInstance: builtinInstance{
-			ctx:      context.Background(),
-			timeout:  defaultInstanceTimeout,
-			shutdown: func() {},
-		},
-	}
-
-	// apply options
-	for _, opt := range options {
-		opt(&res.builtinInstance)
-	}
-
-	// init timer
-	res.timeoutTicker = time.NewTicker(res.timeout)
-
-	// setup internally-cancellable context
-	prevCancel := res.shutdown
-	cancelableCtx, cancelCtx := context.WithCancel(res.ctx)
-	res.ctx = cancelableCtx
-	res.shutdown = func() {
-		cancelCtx()
-		prevCancel()
-	}
-
-	return res, nil
 }
