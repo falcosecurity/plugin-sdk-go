@@ -18,9 +18,13 @@ limitations under the License.
 // The plugin produces events of the "example" data source containing
 // a single uint64 representing the incrementing value of a counter,
 // serialized using a encoding/gob encoder.
+// This plugin makes use of the SDK-provided "pull" source instance to
+// open the event source, so we'll not provide a type implementation of
+// the source.Instance interface here
 package main
 
 import (
+	"context"
 	"encoding/gob"
 	"fmt"
 	"time"
@@ -41,21 +45,6 @@ import (
 type MyPlugin struct {
 	plugins.BasePlugin
 	config string
-}
-
-// Defining a type for the plugin source capture instances returned by Open().
-// Multiple instances of the same plugin can be opened for different capture
-// sessions.
-//
-// Composing the struct with plugins.BaseInstance is the recommended practice
-// as it provides the boilerplate code that satisfies most of the interface
-// requirements of the SDK.
-//
-// State variables to store in each plugin instance must be defined here.
-// In this example, we store the internal value of the incrementing counter.
-type MyInstance struct {
-	source.BaseInstance
-	counter uint64
 }
 
 // The plugin must be registered to the SDK in the init() function.
@@ -93,12 +82,20 @@ func (m *MyPlugin) Init(config string) error {
 }
 
 // Open opens the plugin source and starts a new capture session (e.g. stream
-// of events), creating a new plugin instance. The state of each instance can
-// be initialized here. This method is mandatory for the event sourcing capability.
+// of events). This uses the SDK built-in source.OpenPullInstance() function
+// that allows creating an event source by simply providing a event-generating
+// callback. This method is mandatory for the event sourcing capability.
 func (m *MyPlugin) Open(params string) (source.Instance, error) {
-	return &MyInstance{
-		counter: 0,
-	}, nil
+	counter := 0
+	pull := func(ctx context.Context, ps sdk.PluginState, evt sdk.EventWriter) error {
+		counter++
+		if err := gob.NewEncoder(evt.Writer()).Encode(counter); err != nil {
+			return err
+		}
+		evt.SetTimestamp(uint64(time.Now().UnixNano()))
+		return nil
+	}
+	return source.OpenPullInstance(pull)
 }
 
 // String produces a string representation of an event data produced by the
@@ -112,37 +109,6 @@ func (m *MyPlugin) String(evt sdk.EventReader) (string, error) {
 	}
 	return fmt.Sprintf("counter: %d", value), nil
 }
-
-// NextBatch produces a batch of new events, and is called repeatedly by the
-// framework. For plugins with event sourcing capability, it's mandatory to
-// specify a NextBatch method.
-// The batch has a maximum size that dependes on the size of the underlying
-// reusable memory buffer. A batch can be smaller than the maximum size.
-func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (int, error) {
-	// We ignore the batching feature here, and just produce one event per time
-	evt := evts.Get(0)
-	m.counter++
-	encoder := gob.NewEncoder(evt.Writer())
-	if err := encoder.Encode(m.counter); err != nil {
-		return 0, err
-	}
-	evt.SetTimestamp(uint64(time.Now().UnixNano()))
-	return 1, nil
-}
-
-// Progress returns a percentage indicator referring to the production progress
-// of the event source of this plugin.
-// This method is optional for the event sourcing capability.
-// func (m *MyInstance) Progress(pState sdk.PluginState) (float64, string) {
-//
-// }
-
-// Close is gets called by the SDK when the plugin source capture gets closed.
-// This is useful to release any open resource used by each plugin instance.
-// This method is optional for the event sourcing capability.
-// func (m *MyInstance) Close() {
-//
-// }
 
 // Destroy is gets called by the SDK when the plugin gets deinitialized.
 // This is useful to release any open resource used by the plugin.
