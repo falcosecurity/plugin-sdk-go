@@ -70,7 +70,7 @@ func benchPullInstance(b *testing.B, onEvt func() []byte) {
 		_, err := e.Writer().Write(onEvt())
 		return err
 	}
-	inst, err := OpenPullInstance(pull, WithInstanceTimeout(benchEvtTimeout))
+	inst, err := NewPullInstance(pull, WithInstanceTimeout(benchEvtTimeout))
 	if err != nil {
 		b.Fatal(err.Error())
 	}
@@ -89,7 +89,7 @@ func benchPushInstance(b *testing.B, onEvt func() []byte) {
 			}
 		}
 	}()
-	inst, err := OpenPushInstance(evtChan, WithInstanceTimeout(benchEvtTimeout))
+	inst, err := NewPushInstance(evtChan, WithInstanceTimeout(benchEvtTimeout))
 	if err != nil {
 		b.Fatal(err.Error())
 	}
@@ -167,7 +167,7 @@ func TestPullInstance(t *testing.T) {
 	close := func() { closed = true }
 
 	// open instance
-	inst, err := OpenPullInstance(
+	inst, err := NewPullInstance(
 		pull,
 		WithInstanceTimeout(timeout),
 		WithInstanceClose(close),
@@ -222,7 +222,7 @@ func TestPullInstanceCtxCanceling(t *testing.T) {
 	pull := func(c context.Context, e sdk.EventWriter) error {
 		return sdk.ErrTimeout
 	}
-	inst, err := OpenPullInstance(pull, WithInstanceContext(ctx))
+	inst, err := NewPullInstance(pull, WithInstanceContext(ctx))
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -275,7 +275,7 @@ func TestPushInstance(t *testing.T) {
 	close := func() { closed = true }
 
 	// open instance
-	inst, err := OpenPushInstance(
+	inst, err := NewPushInstance(
 		evtChan,
 		WithInstanceTimeout(timeout),
 		WithInstanceClose(close),
@@ -328,7 +328,7 @@ func TestPushInstanceChanClosing(t *testing.T) {
 	}
 
 	evtChan := make(chan PushEvent)
-	inst, err := OpenPushInstance(evtChan)
+	inst, err := NewPushInstance(evtChan)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -363,7 +363,7 @@ func TestPushInstanceCtxCanceling(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	evtChan := make(chan PushEvent)
 	defer close(evtChan)
-	inst, err := OpenPushInstance(evtChan, WithInstanceContext(ctx))
+	inst, err := NewPushInstance(evtChan, WithInstanceContext(ctx))
 	if err != nil {
 		t.Fatal(err.Error())
 	}

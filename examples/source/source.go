@@ -82,11 +82,11 @@ func (m *MyPlugin) Init(config string) error {
 }
 
 // Open opens the plugin source and starts a new capture session (e.g. stream
-// of events). This uses the SDK built-in source.OpenPullInstance() function
+// of events). This uses the SDK built-in source.NewPullInstance() function
 // that allows creating an event source by simply providing a event-generating
 // callback. This method is mandatory for the event sourcing capability.
 func (m *MyPlugin) Open(params string) (source.Instance, error) {
-	counter := 0
+	counter := uint64(0)
 	pull := func(ctx context.Context, evt sdk.EventWriter) error {
 		counter++
 		if err := gob.NewEncoder(evt.Writer()).Encode(counter); err != nil {
@@ -95,7 +95,7 @@ func (m *MyPlugin) Open(params string) (source.Instance, error) {
 		evt.SetTimestamp(uint64(time.Now().UnixNano()))
 		return nil
 	}
-	return source.OpenPullInstance(pull)
+	return source.NewPullInstance(pull)
 }
 
 // String produces a string representation of an event data produced by the
