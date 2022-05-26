@@ -66,7 +66,7 @@ func benchNextBatch(b *testing.B, inst Instance, batchSize, evtCount int) {
 }
 
 func benchPullInstance(b *testing.B, onEvt func() []byte) {
-	pull := func(c context.Context, s sdk.PluginState, e sdk.EventWriter) error {
+	pull := func(c context.Context, e sdk.EventWriter) error {
 		_, err := e.Writer().Write(onEvt())
 		return err
 	}
@@ -150,7 +150,7 @@ func TestPullInstance(t *testing.T) {
 
 	// setup evt generation callback
 	nEvt := 0
-	pull := func(c context.Context, s sdk.PluginState, e sdk.EventWriter) error {
+	pull := func(c context.Context, e sdk.EventWriter) error {
 		if nEvt == 0 {
 			time.Sleep(timeout * 10)
 		}
@@ -219,7 +219,7 @@ func TestPullInstanceCtxCanceling(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	pull := func(c context.Context, s sdk.PluginState, e sdk.EventWriter) error {
+	pull := func(c context.Context, e sdk.EventWriter) error {
 		return sdk.ErrTimeout
 	}
 	inst, err := OpenPullInstance(pull, WithInstanceContext(ctx))

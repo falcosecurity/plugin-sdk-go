@@ -30,47 +30,27 @@ var (
 
 type builtinInstance struct {
 	BaseInstance
-	shutdown func()
-	ctx      context.Context
-	timeout  time.Duration
-}
-
-type pullInstance struct {
-	builtinInstance
-	eof           bool
-	pull          PullFunc
+	shutdown      func()
+	progress      func() (float64, string)
+	ctx           context.Context
+	timeout       time.Duration
 	timeoutTicker *time.Ticker
-}
-
-type pushInstance struct {
-	builtinInstance
 	eof           bool
-	evtC          <-chan PushEvent
-	timeoutTicker *time.Ticker
 }
 
-// PullFunc produces a new event and returns a non-nil error in case of failure.
-//
-// The event data is produced through the sdk.EventWriter interface.
-// The sdk.PluginState argument is the state of the plugin for this the given
-// event source has been opened, and should be casted to its specific type.
-// The context argument can be used to check for termination signals, which
-// happen when the framework closes the event source or when the optional
-// context passed-in by the user gets cancelled.
-type PullFunc func(context.Context, sdk.PluginState, sdk.EventWriter) error
+func (s *builtinInstance) Close() {
+	// this cancels the context and calls the optional callback
+	s.shutdown()
 
-// PushEvent represents an event produced from an event source with pull model.
-//
-// If the event source produced the event successfully, then Data must be non-nil
-// and Err must be ni. If the event source encountered a failure, Data must be
-// nil and Err should contain an error describing the failure.
-//
-// Timestamp can be optionally set to indicate a specific timestamp for the
-// produced event.
-type PushEvent struct {
-	Err       error
-	Data      []byte
-	Timestamp time.Time
+	// stop timeout ticker
+	s.timeoutTicker.Stop()
+}
+
+func (s *builtinInstance) Progress(pState sdk.PluginState) (float64, string) {
+	if s.progress != nil {
+		return s.progress()
+	}
+	return 0, ""
 }
 
 // WithInstanceContext sets a custom context in the opened event source.
@@ -100,6 +80,27 @@ func WithInstanceClose(close func()) func(*builtinInstance) {
 	}
 }
 
+// WithInstanceProgress sets a custom callback for the framework to request
+// a the progress state of the opened event stream
+func WithInstanceProgress(progress func() (float64, string)) func(*builtinInstance) {
+	return func(s *builtinInstance) {
+		s.progress = progress
+	}
+}
+
+// PullFunc produces a new event and returns a non-nil error in case of failure.
+//
+// The event data is produced through the sdk.EventWriter interface.
+// The context argument can be used to check for termination signals, which
+// happen when the framework closes the event source or when the optional
+// context passed-in by the user gets cancelled.
+type PullFunc func(context.Context, sdk.EventWriter) error
+
+type pullInstance struct {
+	builtinInstance
+	pull PullFunc
+}
+
 // NewPullInstance opens a new event source and starts a capture session,
 // filling the event batches with a pull model.
 //
@@ -122,12 +123,12 @@ func WithInstanceClose(close func()) func(*builtinInstance) {
 // user-configured context is cancelled.
 func OpenPullInstance(pull PullFunc, options ...func(*builtinInstance)) (Instance, error) {
 	res := &pullInstance{
-		eof:  false,
 		pull: pull,
 		builtinInstance: builtinInstance{
 			ctx:      context.Background(),
 			timeout:  defaultInstanceTimeout,
 			shutdown: func() {},
+			eof:      false,
 		},
 	}
 
@@ -177,7 +178,7 @@ func (s *pullInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) 
 		}
 
 		// pull a new event
-		if err = s.pull(s.ctx, pState, evts.Get(n)); err != nil {
+		if err = s.pull(s.ctx, evts.Get(n)); err != nil {
 			return
 		}
 		n++
@@ -187,12 +188,23 @@ func (s *pullInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) 
 	return n, nil
 }
 
-func (s *pullInstance) Close() {
-	// this cancels the context and calls the optional callback
-	s.shutdown()
+// PushEvent represents an event produced from an event source with pull model.
+//
+// If the event source produced the event successfully, then Data must be non-nil
+// and Err must be ni. If the event source encountered a failure, Data must be
+// nil and Err should contain an error describing the failure.
+//
+// Timestamp can be optionally set to indicate a specific timestamp for the
+// produced event.
+type PushEvent struct {
+	Err       error
+	Data      []byte
+	Timestamp time.Time
+}
 
-	// stop timeout ticker
-	s.timeoutTicker.Stop()
+type pushInstance struct {
+	builtinInstance
+	evtC <-chan PushEvent
 }
 
 // OpenPushInstance opens a new event source and starts a capture session,
@@ -211,12 +223,12 @@ func (s *pullInstance) Close() {
 // source.PushEvent containing a non-nil Err.
 func OpenPushInstance(evtC <-chan PushEvent, options ...func(*builtinInstance)) (Instance, error) {
 	res := &pushInstance{
-		eof:  false,
 		evtC: evtC,
 		builtinInstance: builtinInstance{
 			ctx:      context.Background(),
 			timeout:  defaultInstanceTimeout,
 			shutdown: func() {},
+			eof:      false,
 		},
 	}
 
@@ -287,12 +299,4 @@ func (s *pushInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) 
 		}
 	}
 	return n, nil
-}
-
-func (s *pushInstance) Close() {
-	// this cancels the context and calls the optional callback
-	s.shutdown()
-
-	// stop timeout ticker
-	s.timeoutTicker.Stop()
 }

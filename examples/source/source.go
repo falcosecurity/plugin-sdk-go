@@ -87,7 +87,7 @@ func (m *MyPlugin) Init(config string) error {
 // callback. This method is mandatory for the event sourcing capability.
 func (m *MyPlugin) Open(params string) (source.Instance, error) {
 	counter := 0
-	pull := func(ctx context.Context, ps sdk.PluginState, evt sdk.EventWriter) error {
+	pull := func(ctx context.Context, evt sdk.EventWriter) error {
 		counter++
 		if err := gob.NewEncoder(evt.Writer()).Encode(counter); err != nil {
 			return err
