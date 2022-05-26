@@ -121,7 +121,7 @@ type pullInstance struct {
 // The context passed-in to the pull function is cancelled automatically
 // when the framework invokes Close() on the event source, or when the
 // user-configured context is cancelled.
-func OpenPullInstance(pull PullFunc, options ...func(*builtinInstance)) (Instance, error) {
+func NewPullInstance(pull PullFunc, options ...func(*builtinInstance)) (Instance, error) {
 	res := &pullInstance{
 		pull: pull,
 		builtinInstance: builtinInstance{
@@ -207,7 +207,7 @@ type pushInstance struct {
 	evtC <-chan PushEvent
 }
 
-// OpenPushInstance opens a new event source and starts a capture session,
+// NewPushInstance opens a new event source and starts a capture session,
 // filling the event batches with a push model.
 //
 // In this model, events are produced through a channel in the form of
@@ -221,7 +221,7 @@ type pushInstance struct {
 // The opened event source can be manually closed by cancelling the optional
 // passed-in context, by closing the event cannel, or by sending
 // source.PushEvent containing a non-nil Err.
-func OpenPushInstance(evtC <-chan PushEvent, options ...func(*builtinInstance)) (Instance, error) {
+func NewPushInstance(evtC <-chan PushEvent, options ...func(*builtinInstance)) (Instance, error) {
 	res := &pushInstance{
 		evtC: evtC,
 		builtinInstance: builtinInstance{
