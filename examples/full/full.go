@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2021 The Falco Authors.
+Copyright (C) 2022 The Falco Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -79,9 +79,12 @@ type MyInstance struct {
 // This requires our plugin to implement the source.Plugin interface, so
 // compilation will fail if the mandatory methods are not implemented.
 func init() {
-	p := &MyPlugin{}
-	extractor.Register(p)
-	source.Register(p)
+	plugins.SetFactory(func() plugins.Plugin {
+		p := &MyPlugin{}
+		source.Register(p)
+		extractor.Register(p)
+		return p
+	})
 }
 
 // Info returns a pointer to a plugin.Info struct, containing all the
