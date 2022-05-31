@@ -35,9 +35,9 @@ const (
 	benchEvtTimeout       = 30 * time.Millisecond
 )
 
-func benchNextBatch(b *testing.B, inst Instance, batchSize, evtCount int) {
+func benchNextBatch(b *testing.B, inst Instance, batchSize uint32, evtCount int) {
 	batch := &sdk.InMemoryEventWriters{}
-	for i := 0; i < batchSize; i++ {
+	for i := uint32(0); i < batchSize; i++ {
 		batch.Writers = append(batch.Writers, &sdk.InMemoryEventWriter{})
 	}
 	b.ResetTimer()
@@ -144,7 +144,7 @@ func TestPullInstance(t *testing.T) {
 
 	// create batch
 	batch := &sdk.InMemoryEventWriters{}
-	for i := 0; i < sdk.DefaultBatchSize; i++ {
+	for i := uint32(0); i < sdk.DefaultBatchSize; i++ {
 		batch.Writers = append(batch.Writers, &sdk.InMemoryEventWriter{})
 	}
 
@@ -214,7 +214,7 @@ func TestPullInstance(t *testing.T) {
 func TestPullInstanceCtxCanceling(t *testing.T) {
 	// create batch
 	batch := &sdk.InMemoryEventWriters{}
-	for i := 0; i < sdk.DefaultBatchSize; i++ {
+	for i := uint32(0); i < sdk.DefaultBatchSize; i++ {
 		batch.Writers = append(batch.Writers, &sdk.InMemoryEventWriter{})
 	}
 
@@ -252,7 +252,7 @@ func TestPushInstance(t *testing.T) {
 
 	// create batch
 	batch := &sdk.InMemoryEventWriters{}
-	for i := 0; i < sdk.DefaultBatchSize; i++ {
+	for i := uint32(0); i < sdk.DefaultBatchSize; i++ {
 		batch.Writers = append(batch.Writers, &sdk.InMemoryEventWriter{})
 	}
 
@@ -323,7 +323,7 @@ func TestPushInstance(t *testing.T) {
 func TestPushInstanceChanClosing(t *testing.T) {
 	// create batch
 	batch := &sdk.InMemoryEventWriters{}
-	for i := 0; i < sdk.DefaultBatchSize; i++ {
+	for i := uint32(0); i < sdk.DefaultBatchSize; i++ {
 		batch.Writers = append(batch.Writers, &sdk.InMemoryEventWriter{})
 	}
 
@@ -356,7 +356,7 @@ func TestPushInstanceChanClosing(t *testing.T) {
 func TestPushInstanceCtxCanceling(t *testing.T) {
 	// create batch
 	batch := &sdk.InMemoryEventWriters{}
-	for i := 0; i < sdk.DefaultBatchSize; i++ {
+	for i := uint32(0); i < sdk.DefaultBatchSize; i++ {
 		batch.Writers = append(batch.Writers, &sdk.InMemoryEventWriter{})
 	}
 

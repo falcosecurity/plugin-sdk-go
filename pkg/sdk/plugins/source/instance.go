@@ -36,6 +36,8 @@ type builtinInstance struct {
 	timeout       time.Duration
 	timeoutTicker *time.Ticker
 	eof           bool
+	eventSize     uint32
+	batchSize     uint32
 }
 
 func (s *builtinInstance) Close() {
@@ -77,6 +79,22 @@ func WithInstanceTimeout(timeout time.Duration) func(*builtinInstance) {
 func WithInstanceClose(close func()) func(*builtinInstance) {
 	return func(s *builtinInstance) {
 		s.shutdown = close
+	}
+}
+
+// WithInstanceBatchSize sets a custom size for the pre-allocated event batch
+// used by NextBatch()
+func WithInstanceBatchSize(size uint32) func(*builtinInstance) {
+	return func(s *builtinInstance) {
+		s.batchSize = size
+	}
+}
+
+// WithInstanceEventSize sets a custom maximum size for each event returned
+// by NextBatch()
+func WithInstanceEventSize(size uint32) func(*builtinInstance) {
+	return func(s *builtinInstance) {
+		s.eventSize = size
 	}
 }
 
@@ -125,10 +143,12 @@ func NewPullInstance(pull PullFunc, options ...func(*builtinInstance)) (Instance
 	res := &pullInstance{
 		pull: pull,
 		builtinInstance: builtinInstance{
-			ctx:      context.Background(),
-			timeout:  defaultInstanceTimeout,
-			shutdown: func() {},
-			eof:      false,
+			ctx:       context.Background(),
+			timeout:   defaultInstanceTimeout,
+			shutdown:  func() {},
+			eof:       false,
+			batchSize: sdk.DefaultBatchSize,
+			eventSize: sdk.DefaultEvtSize,
 		},
 	}
 
@@ -136,6 +156,13 @@ func NewPullInstance(pull PullFunc, options ...func(*builtinInstance)) (Instance
 	for _, opt := range options {
 		opt(&res.builtinInstance)
 	}
+
+	// create custom-sized event batch
+	batch, err := sdk.NewEventWriters(int64(res.batchSize), int64(res.eventSize))
+	if err != nil {
+		return nil, err
+	}
+	res.SetEvents(batch)
 
 	// init timer
 	res.timeoutTicker = time.NewTicker(res.timeout)
@@ -225,10 +252,12 @@ func NewPushInstance(evtC <-chan PushEvent, options ...func(*builtinInstance)) (
 	res := &pushInstance{
 		evtC: evtC,
 		builtinInstance: builtinInstance{
-			ctx:      context.Background(),
-			timeout:  defaultInstanceTimeout,
-			shutdown: func() {},
-			eof:      false,
+			ctx:       context.Background(),
+			timeout:   defaultInstanceTimeout,
+			shutdown:  func() {},
+			eof:       false,
+			batchSize: sdk.DefaultBatchSize,
+			eventSize: sdk.DefaultEvtSize,
 		},
 	}
 
@@ -236,6 +265,13 @@ func NewPushInstance(evtC <-chan PushEvent, options ...func(*builtinInstance)) (
 	for _, opt := range options {
 		opt(&res.builtinInstance)
 	}
+
+	// create custom-sized event batch
+	batch, err := sdk.NewEventWriters(int64(res.batchSize), int64(res.eventSize))
+	if err != nil {
+		return nil, err
+	}
+	res.SetEvents(batch)
 
 	// init timer
 	res.timeoutTicker = time.NewTicker(res.timeout)

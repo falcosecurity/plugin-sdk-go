@@ -45,7 +45,7 @@ const DefaultEvtSize uint32 = 256 * 1024
 
 // DefaultBatchSize is the default number of events in the EventWriters
 // interface used by the SDK.
-const DefaultBatchSize = 128
+const DefaultBatchSize uint32 = 128
 
 // The full set of values that can be returned in the ftype
 // member of ss_plugin_extract_field structs.
