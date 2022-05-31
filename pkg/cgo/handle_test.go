@@ -84,6 +84,17 @@ func TestInvalidHandle(t *testing.T) {
 		h.Delete()
 	})
 
+	t.Run("zero-value", func(t *testing.T) {
+		h := Handle(0)
+		defer func() {
+			if r := recover(); r != nil {
+				return
+			}
+			t.Fatalf("Delete of zero handle did not trigger a panic")
+		}()
+		h.Value()
+	})
+
 	t.Run("invalid", func(t *testing.T) {
 		h := NewHandle(42)
 
@@ -96,6 +107,41 @@ func TestInvalidHandle(t *testing.T) {
 		}()
 
 		Handle(h + 1).Delete()
+	})
+}
+
+func TestMaxHandle(t *testing.T) {
+	t.Run("non-max", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("NewHandle with non-max handle count triggered a panic")
+			}
+		}()
+		handles := make([]Handle, 0)
+		for i := 1; i <= MaxHandle; i++ {
+			v := i
+			handles = append(handles, NewHandle(&v))
+		}
+		for _, h := range handles {
+			h.Delete()
+		}
+	})
+
+	t.Run("max", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				return
+			}
+			t.Fatalf("NewHandle with max handle count did not triggered a panic")
+		}()
+		handles := make([]Handle, 0)
+		for i := 1; i <= MaxHandle+1; i++ {
+			v := i
+			handles = append(handles, NewHandle(&v))
+		}
+		for _, h := range handles {
+			h.Delete()
+		}
 	})
 }
 
