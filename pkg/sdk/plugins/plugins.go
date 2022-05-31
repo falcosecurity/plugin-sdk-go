@@ -140,7 +140,7 @@ type BasePlugin struct {
 // FactoryFunc creates a new Plugin
 type FactoryFunc func() Plugin
 
-// SetFactory sets the FactoryFunc to be called when creating a new Plugin.
+// SetFactory sets the FactoryFunc to be used by the SDK when creating a new Plugin
 //
 // SetFactory should be called in the Go init() function of the plugin main package.
 // It hooks the plugin framework initialization stage to create a new Plugin and
