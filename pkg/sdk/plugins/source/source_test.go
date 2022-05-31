@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2021 The Falco Authors.
+Copyright (C) 2022 The Falco Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ limitations under the License.
 package source
 
 import (
-	"testing"
-
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins"
 )
@@ -57,21 +55,4 @@ func (m *testPlugin) String(evt sdk.EventReader) (string, error) {
 
 func (m *testInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (int, error) {
 	return 0, nil
-}
-
-func assertPanic(t *testing.T, fun func()) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("expected panic")
-		}
-	}()
-	fun()
-}
-
-func TestRegister(t *testing.T) {
-	registerFunc := func() {
-		Register(&testPlugin{})
-	}
-	registerFunc()
-	assertPanic(t, registerFunc)
 }
