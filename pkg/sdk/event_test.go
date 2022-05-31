@@ -69,7 +69,7 @@ func BenchmarkEventWritersNext(b *testing.B) {
 }
 
 func BenchmarkEventWritersNextBatch(b *testing.B) {
-	writers, err := NewEventWriters(DefaultBatchSize, int64(DefaultEvtSize))
+	writers, err := NewEventWriters(int64(DefaultBatchSize), int64(DefaultEvtSize))
 	if err != nil {
 		println(err.Error())
 		b.Fail()
@@ -88,7 +88,7 @@ func BenchmarkEventWritersNextBatch(b *testing.B) {
 }
 
 func TestEventWritersNextBatch(t *testing.T) {
-	events, err := NewEventWriters(DefaultBatchSize, int64(DefaultEvtSize))
+	events, err := NewEventWriters(int64(DefaultBatchSize), int64(DefaultEvtSize))
 	if err != nil {
 		println(err.Error())
 		t.Fail()
