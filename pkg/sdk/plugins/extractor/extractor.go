@@ -38,6 +38,13 @@ type Plugin interface {
 	Fields() []sdk.FieldEntry
 }
 
+func enableAsync(handle cgo.Handle) {
+	extract.StartAsync()
+	hooks.SetOnBeforeDestroy(func(handle cgo.Handle) {
+		extract.StopAsync()
+	})
+}
+
 // Register registers the field extraction capability in the framework for the given Plugin.
 //
 // This function should be called from the provided plugins.FactoryFunc implementation.
@@ -47,10 +54,5 @@ func Register(p Plugin) {
 	fields.SetFields(p.Fields())
 
 	// setup hooks for automatically start/stop async extraction
-	hooks.SetOnAfterInit(func(handle cgo.Handle) {
-		extract.StartAsync()
-		hooks.SetOnBeforeDestroy(func(handle cgo.Handle) {
-			extract.StopAsync()
-		})
-	})
+	hooks.SetOnAfterInit(enableAsync)
 }
