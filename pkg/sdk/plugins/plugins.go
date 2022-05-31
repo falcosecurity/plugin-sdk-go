@@ -168,27 +168,29 @@ type FactoryFunc func() Plugin
 //	}
 //
 func SetFactory(f FactoryFunc) {
-	initialize.SetOnInit(func(c string) (sdk.PluginState, error) {
 
+	// Create a new plugin instance to get static plugin info
+	p := f()
+
+	// Set up plugin info
+	i := p.Info()
+	info.SetId(i.ID)
+	info.SetName(i.Name)
+	info.SetDescription(i.Description)
+	info.SetEventSource(i.EventSource)
+	info.SetExtractEventSources(i.ExtractEventSources)
+	info.SetContact(i.Contact)
+	info.SetVersion(i.Version)
+	info.SetRequiredAPIVersion(i.RequiredAPIVersion)
+
+	// Set up plugin init schema, if any
+	if initSchema, ok := p.(sdk.InitSchema); ok {
+		initschema.SetInitSchema(initSchema.InitSchema())
+	}
+
+	initialize.SetOnInit(func(c string) (sdk.PluginState, error) {
 		// Create a new plugin instance
 		p := f()
-
-		// Set up plugin info
-		i := p.Info()
-		info.SetId(i.ID)
-		info.SetName(i.Name)
-		info.SetDescription(i.Description)
-		info.SetEventSource(i.EventSource)
-		info.SetExtractEventSources(i.ExtractEventSources)
-		info.SetContact(i.Contact)
-		info.SetVersion(i.Version)
-		info.SetRequiredAPIVersion(i.RequiredAPIVersion)
-
-		// Set up plugin init schema, if any
-		if initSchema, ok := p.(sdk.InitSchema); ok {
-			initschema.SetInitSchema(initSchema.InitSchema())
-		}
-
 		err := p.Init(c)
 		return p, err
 	})
