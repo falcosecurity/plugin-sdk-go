@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
+	sdkint "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/internal/sdk"
 )
 
 const (
@@ -36,9 +37,9 @@ const (
 )
 
 func benchNextBatch(b *testing.B, inst Instance, batchSize uint32, evtCount int) {
-	batch := &sdk.InMemoryEventWriters{}
+	batch := &sdkint.InMemoryEventWriters{}
 	for i := uint32(0); i < batchSize; i++ {
-		batch.Writers = append(batch.Writers, &sdk.InMemoryEventWriter{})
+		batch.Writers = append(batch.Writers, &sdkint.InMemoryEventWriter{})
 	}
 	b.ResetTimer()
 	tot := 0
@@ -143,9 +144,9 @@ func TestPullInstance(t *testing.T) {
 	timeout := time.Millisecond * 10
 
 	// create batch
-	batch := &sdk.InMemoryEventWriters{}
+	batch := &sdkint.InMemoryEventWriters{}
 	for i := uint32(0); i < sdk.DefaultBatchSize; i++ {
-		batch.Writers = append(batch.Writers, &sdk.InMemoryEventWriter{})
+		batch.Writers = append(batch.Writers, &sdkint.InMemoryEventWriter{})
 	}
 
 	// setup evt generation callback
@@ -213,9 +214,9 @@ func TestPullInstance(t *testing.T) {
 
 func TestPullInstanceCtxCanceling(t *testing.T) {
 	// create batch
-	batch := &sdk.InMemoryEventWriters{}
+	batch := &sdkint.InMemoryEventWriters{}
 	for i := uint32(0); i < sdk.DefaultBatchSize; i++ {
-		batch.Writers = append(batch.Writers, &sdk.InMemoryEventWriter{})
+		batch.Writers = append(batch.Writers, &sdkint.InMemoryEventWriter{})
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -251,9 +252,9 @@ func TestPushInstance(t *testing.T) {
 	timeout := time.Millisecond * 100
 
 	// create batch
-	batch := &sdk.InMemoryEventWriters{}
+	batch := &sdkint.InMemoryEventWriters{}
 	for i := uint32(0); i < sdk.DefaultBatchSize; i++ {
-		batch.Writers = append(batch.Writers, &sdk.InMemoryEventWriter{})
+		batch.Writers = append(batch.Writers, &sdkint.InMemoryEventWriter{})
 	}
 
 	// setup evt generation worker
@@ -322,9 +323,9 @@ func TestPushInstance(t *testing.T) {
 
 func TestPushInstanceChanClosing(t *testing.T) {
 	// create batch
-	batch := &sdk.InMemoryEventWriters{}
+	batch := &sdkint.InMemoryEventWriters{}
 	for i := uint32(0); i < sdk.DefaultBatchSize; i++ {
-		batch.Writers = append(batch.Writers, &sdk.InMemoryEventWriter{})
+		batch.Writers = append(batch.Writers, &sdkint.InMemoryEventWriter{})
 	}
 
 	evtChan := make(chan PushEvent)
@@ -355,9 +356,9 @@ func TestPushInstanceChanClosing(t *testing.T) {
 
 func TestPushInstanceCtxCanceling(t *testing.T) {
 	// create batch
-	batch := &sdk.InMemoryEventWriters{}
+	batch := &sdkint.InMemoryEventWriters{}
 	for i := uint32(0); i < sdk.DefaultBatchSize; i++ {
-		batch.Writers = append(batch.Writers, &sdk.InMemoryEventWriter{})
+		batch.Writers = append(batch.Writers, &sdkint.InMemoryEventWriter{})
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

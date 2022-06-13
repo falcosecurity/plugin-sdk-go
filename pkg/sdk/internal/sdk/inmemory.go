@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"io"
 	"unsafe"
+
+	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 )
 
 // InMemoryExtractRequest is an in-memory implementation of
@@ -75,10 +77,10 @@ func (i *InMemoryExtractRequest) SetPtr(ptr unsafe.Pointer) {
 // InMemoryExtractRequestPool is an in-memory implementation of
 // sdk.ExtractRequestPool that allows changing its internal values.
 type InMemoryExtractRequestPool struct {
-	Requests map[int]ExtractRequest
+	Requests map[int]sdk.ExtractRequest
 }
 
-func (i *InMemoryExtractRequestPool) Get(requestIndex int) ExtractRequest {
+func (i *InMemoryExtractRequestPool) Get(requestIndex int) sdk.ExtractRequest {
 	return i.Requests[requestIndex]
 }
 
@@ -105,12 +107,12 @@ func (i *InMemoryEventWriter) SetTimestamp(value uint64) {
 // InMemoryEventWriters is an in-memory implementation of
 // sdk.EventWriters that allows changing its internal values.
 type InMemoryEventWriters struct {
-	Writers     []EventWriter
+	Writers     []sdk.EventWriter
 	ValArrayPtr unsafe.Pointer
 	OnFree      func()
 }
 
-func (i *InMemoryEventWriters) Get(eventIndex int) EventWriter {
+func (i *InMemoryEventWriters) Get(eventIndex int) sdk.EventWriter {
 	return i.Writers[eventIndex]
 }
 
