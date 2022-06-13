@@ -19,6 +19,7 @@ package source
 import (
 	"context"
 	"io"
+	"math"
 	"time"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
@@ -206,10 +207,11 @@ func (s *pullInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) 
 
 		// pull a new event
 		if err = s.pull(s.ctx, evts.Get(n)); err != nil {
-			if err == sdk.ErrEOF {
+			// in case of non-timeout error, we consider the event source ended
+			if err != sdk.ErrTimeout {
 				s.eof = true
 			}
-			return
+			return n, err
 		}
 		n++
 	}
@@ -320,7 +322,10 @@ func (s *pushInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) 
 			}
 			// an error occurred, so we need to exit
 			if evt.Err != nil {
-				s.eof = true
+				// in case of non-timeout error, we consider the event source ended
+				if evt.Err != sdk.ErrTimeout {
+					s.eof = true
+				}
 				return n, evt.Err
 			}
 			// event added to the batch successfully
