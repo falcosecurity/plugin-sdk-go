@@ -206,6 +206,9 @@ func (s *pullInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) 
 
 		// pull a new event
 		if err = s.pull(s.ctx, evts.Get(n)); err != nil {
+			if err == sdk.ErrEOF {
+				s.eof = true
+			}
 			return
 		}
 		n++
@@ -215,7 +218,7 @@ func (s *pullInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) 
 	return n, nil
 }
 
-// PushEvent represents an event produced from an event source with pull model.
+// PushEvent represents an event produced from an event source with the push model.
 //
 // If the event source produced the event successfully, then Data must be non-nil
 // and Err must be ni. If the event source encountered a failure, Data must be
@@ -321,7 +324,9 @@ func (s *pushInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) 
 				return n, evt.Err
 			}
 			// event added to the batch successfully
-			if !evt.Timestamp.IsZero() {
+			if evt.Timestamp.IsZero() {
+				evts.Get(n).SetTimestamp(math.MaxUint64)
+			} else {
 				evts.Get(n).SetTimestamp(uint64(evt.Timestamp.UnixNano()))
 			}
 			n++
