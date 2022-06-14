@@ -114,6 +114,8 @@ var (
 	errNoSourcingCap  = errors.New("plugin does not support event sourcing capability")
 )
 
+// Plugin represents a Falcosecurity Plugin loaded from an external shared
+// dynamic library
 type Plugin struct {
 	m          sync.Mutex
 	handle     *C.plugin_handle_t
@@ -126,6 +128,8 @@ type Plugin struct {
 	validErr   error
 }
 
+// LoadAndValidate loads a Plugin and validates it in a single operation.
+// It is equivalent to invoking Load() and Plugin.Validate() in sequence.
 func LoadAndValidate(path string) (*Plugin, error) {
 	p, err := Load(path)
 	if err != nil {
@@ -139,6 +143,20 @@ func LoadAndValidate(path string) (*Plugin, error) {
 	return p, nil
 }
 
+// Load loads a Falcosecurity plugin from the dynamic library present in the
+// local filesystem at the given path. If successful, returns a *Plugin
+// representing the loaded plugin and a nil error. Otherwise, returns a non-nil
+// error containing the failure condition.
+//
+// Although this reads the content of the dynamic library, this does not check
+// that the returned Plugin is valid and complies to the currently supported
+// plugin API version. Refer to the Plugin.Validate() function for performing
+// validation checks of this kind.
+//
+// Separating the loading step from the validation one allows developers to open
+// plugins that are either corrupted or developed towards an older API version.
+// This can be useful to inspect static descriptive data of those plugins too,
+// such as the name or the version.
 func Load(path string) (*Plugin, error) {
 	// load library
 	errBuf := (*C.char)(C.malloc(C.uint64_t(C.__plugin_max_errlen) * C.sizeof_char))
@@ -191,6 +209,10 @@ func Load(path string) (*Plugin, error) {
 	return p, nil
 }
 
+// Unload unloads a Plugin and disposes it allocated resources.
+// If the plugin was initialized, this invokes the plugin_destroy symbol.
+//
+// The behavior of Unload() an already-unloaded Plugins is undefined.
 func (p *Plugin) Unload() {
 	p.m.Lock()
 	defer p.m.Unlock()
@@ -217,32 +239,54 @@ func (p *Plugin) validate() error {
 	return p.validErr
 }
 
+// Validates returns nil if the Plugin is well-formed and compatible with
+// the plugin API version supported by the loader. Otherwise, returns an
+// error describing what makes the plugin invalid.
 func (p *Plugin) Validate() error {
 	p.m.Lock()
 	defer p.m.Unlock()
 	return p.validate()
 }
 
+// HasCapExtraction returns true if the plugin supports the
+// field extraction capability.
 func (p *Plugin) HasCapExtraction() bool {
 	return p.caps&C.CAP_EXTRACTION != 0
 }
 
+// HasCapSourcing returns true if the plugin supports the
+// event sourcing capability.
 func (p *Plugin) HasCapSourcing() bool {
 	return p.caps&C.CAP_SOURCING != 0
 }
 
+// Info returns a pointer to a Info struct, containing all the general
+// information about this plugin. Can return nil if info are not available.
 func (p *Plugin) Info() *plugins.Info {
 	return &p.info
 }
 
+// InitSchema implements the sdk.InitSchema interface. Returns a
+// schema describing the data expected to be passed as a configuration
+// during the plugin initialization.
+// Can return nil if the schema is not available.
 func (p *Plugin) InitSchema() *sdk.SchemaInfo {
 	return p.initSchema
 }
 
+// Fields return the list of extractor fields exported by this plugin.
+// If the plugin does not support the field extraction capability, this
+// returns an empty list.
 func (p *Plugin) Fields() []sdk.FieldEntry {
 	return p.fields
 }
 
+// OpenParams implements the sdk.OpenParams interface.
+// Returns a list of suggested open parameters. Returns a non-nil error in one
+// of the following conditions:
+//   - Plugin is not initialized
+//   - Plugin does not support the event sourcing capability
+//   - Plugin does not implement the plugin_list_open_params symbol
 func (p *Plugin) OpenParams() ([]sdk.OpenParam, error) {
 	p.m.Lock()
 	defer p.m.Unlock()
@@ -273,6 +317,12 @@ func (p *Plugin) OpenParams() ([]sdk.OpenParam, error) {
 	return ret, nil
 }
 
+// Init initializes this plugin with a given config string. A successful call
+// to init returns a nil error. If the plugin supports an init config schema
+// (e.g. Plugin.InitSchema returns a non-nil value), the config string is
+// validated with the schema and a non-nil error is returned for validation
+// failures. Invoking Init() multiple times returns an error. Once initalized,
+// the plugin gets destroyed when calling Unload().
 func (p *Plugin) Init(config string) error {
 	p.m.Lock()
 	defer p.m.Unlock()
