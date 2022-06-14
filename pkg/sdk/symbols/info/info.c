@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 #include "info.h"
-#include "../../plugin_info.h"
+#include "../../plugin_types.h"
+#include "../../plugin_api.h"
 
 const char* get_default_required_api_version()
 {
