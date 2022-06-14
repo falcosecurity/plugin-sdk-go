@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package symbols provides prebuilt implementations for all the C symbols
-// required to develop plugins as for the definitions of plugin_info.h.
+// required to develop plugins as for the definitions of plugin_types.h.
 //
 // This package defines low-level constructs for plugin development meant
 // for advanced users that wish to use only a portion of the SDK internals.

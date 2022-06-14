@@ -22,8 +22,7 @@ limitations under the License.
 // the sdk.LastErrorBuffer interface, and either the error or the sdk.LastError
 // interfaces.
 //
-// This function is part of the source_plugin_info and extractor_plugin_info
-// interfaces as defined in plugin_info.h.
+// This function is part of the plugin_api interface as defined in plugin_api.h.
 // In almost all cases, your plugin should import this module, unless your
 // plugin exports those symbols by other means.
 package lasterr

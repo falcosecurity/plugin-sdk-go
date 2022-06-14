@@ -33,8 +33,7 @@ limitations under the License.
 // on the returned sdk.EventWriters. Finally, the function deletes the
 // h cgo.Handle.
 //
-// This function is part of the source_plugin_info interface as defined
-// in plugin_info.h.
+// This function is part of the plugin_api interface as defined in plugin_api.h.
 // In almost all cases, your plugin should import this module, unless your
 // plugin exports those symbols by other means.
 package open

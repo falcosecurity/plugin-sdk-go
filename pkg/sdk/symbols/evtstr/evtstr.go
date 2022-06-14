@@ -21,13 +21,13 @@ limitations under the License.
 // of cgo.Handle from this SDK. The value of the s handle must implement
 // the sdk.Stringer and sdk.StringerBuffer interfaces.
 //
-// This function is part of the source_plugin_info interface as defined in
-// plugin_info.h. In almost all cases, your plugin should import this module,
+// This function is part of the plugin_api interface as defined in plugin_api.h.
+// In almost all cases, your plugin should import this module,
 // unless your plugin exports those symbols by other means.
 package evtstr
 
 /*
-#include "../../plugin_info.h"
+#include "../../plugin_types.h"
 */
 import "C"
 import (

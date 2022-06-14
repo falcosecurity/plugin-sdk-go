@@ -11,29 +11,30 @@
 # specific language governing permissions and limitations under the License.
 #
 SHELL := /bin/bash
-GO ?= $(shell which go)
-CURL = curl
+GO    ?= $(shell which go)
+CURL  ?= $(shell which curl)
 
-FALCOSECURITY_LIBS_REVISION ?= a188028bbaa759636cc46a7c59bcb805195ae974
-FALCOSECURITY_LIBS_REPO ?= falcosecurity/libs
-
-PLUGIN_INFO_DIR=pkg/sdk
-PLUGIN_INFO_URL=https://raw.githubusercontent.com/${FALCOSECURITY_LIBS_REPO}/${FALCOSECURITY_LIBS_REVISION}/userspace/libscap/plugin_info.h
+PLUGINLIB_URL=https://raw.githubusercontent.com/${FALCOSECURITY_LIBS_REPO}/${FALCOSECURITY_LIBS_REVISION}/userspace/plugin
 
 examples_dir = $(shell ls -d examples/*/ | cut -f2 -d'/' | xargs)
 examples_build = $(addprefix example-,$(examples_dir))
 examples_clean = $(addprefix clean-example-,$(examples_dir))
 
 .PHONY: all
-all: plugin_info examples
+all: pluginlib examples
 
 .PHONY: clean
-clean: $(examples_clean)
-	@rm -f $(PLUGIN_INFO_DIR)/plugin_info.h
+clean: clean-pluginlib $(examples_clean)
 
-.PHONY: plugin_info
-plugin_info:
-	@$(CURL) -Lso $(PLUGIN_INFO_DIR)/plugin_info.h $(PLUGIN_INFO_URL)
+.PHONY: pluginlib
+pluginlib:
+	@$(CURL) -Lso pkg/sdk/plugin_types.h $(PLUGINLIB_URL)/plugin_types.h
+	@$(CURL) -Lso pkg/sdk/plugin_api.h $(PLUGINLIB_URL)/plugin_api.h
+
+clean-pluginlib:
+	@rm -f \
+		pkg/sdk/plugin_types.h \
+		pkg/sdk/plugin_api.h \
 
 .PHONY: test
 test:

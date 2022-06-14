@@ -22,8 +22,8 @@ limitations under the License.
 // the sdk.PluginState interface. The value of the h handle must implement
 // the sdk.Progresser and sdk.ProgressBuffer interfaces.
 //
-// This function is part of the source_plugin_info interface as defined in
-// plugin_info.h. In almost all cases, your plugin should import this module,
+// This function is part of the plugin_api interface as defined in plugin_api.h.
+// In almost all cases, your plugin should import this module,
 // unless your plugin exports those symbols by other means.
 package progress
 
