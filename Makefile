@@ -32,11 +32,15 @@ clean: clean-pluginlib $(examples_clean)
 pluginlib:
 	@$(CURL) -Lso pkg/sdk/plugin_types.h $(PLUGINLIB_URL)/plugin_types.h
 	@$(CURL) -Lso pkg/sdk/plugin_api.h $(PLUGINLIB_URL)/plugin_api.h
+	@$(CURL) -Lso pkg/loader/plugin_loader.h $(PLUGINLIB_URL)/plugin_loader.h
+	@$(CURL) -Lso pkg/loader/plugin_loader.c $(PLUGINLIB_URL)/plugin_loader.c
 
 clean-pluginlib:
 	@rm -f \
 		pkg/sdk/plugin_types.h \
 		pkg/sdk/plugin_api.h \
+		pkg/loader/plugin_loader.h \
+		pkg/loader/plugin_loader.c
 
 .PHONY: test
 test:
