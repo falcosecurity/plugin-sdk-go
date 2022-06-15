@@ -35,8 +35,8 @@ const (
 )
 
 const (
-	starvationThresholdNs = 1e6
-	sleepTimeNs           = 1e4 * time.Nanosecond
+	starvationThresholdNs = int64(1e6)
+	sleepTimeNs           = 1e7 * time.Nanosecond
 )
 
 var (
@@ -91,7 +91,7 @@ func StartAsync() {
 	atomic.StoreInt32((*int32)(&asyncCtx.lock), state_wait)
 	go func() {
 		lock := (*int32)(&asyncCtx.lock)
-		waitStartTime := time.Now().Nanosecond()
+		waitStartTime := time.Now().UnixNano()
 
 		for {
 			// Check for incoming request, if any, otherwise busy waits
@@ -120,8 +120,8 @@ func StartAsync() {
 			default:
 				// busy wait, then sleep after 1ms
 				if waitStartTime == 0 {
-					waitStartTime = time.Now().Nanosecond()
-				} else if time.Now().Nanosecond()-waitStartTime > starvationThresholdNs {
+					waitStartTime = time.Now().UnixNano()
+				} else if time.Now().UnixNano()-waitStartTime > starvationThresholdNs {
 					time.Sleep(sleepTimeNs)
 				}
 			}
