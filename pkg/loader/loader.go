@@ -128,10 +128,11 @@ type Plugin struct {
 	validErr   error
 }
 
-// LoadAndValidate loads a Plugin and validates it in a single operation.
-// It is equivalent to invoking Load() and Plugin.Validate() in sequence.
-func LoadAndValidate(path string) (*Plugin, error) {
-	p, err := Load(path)
+// NewValidPlugin is the same as NewPlugin(), but returns an error if the loaded
+// plugin is not valid. It is equivalent to invoking NewPlugin() and
+// Plugin.Validate() in sequence.
+func NewValidPlugin(path string) (*Plugin, error) {
+	p, err := NewPlugin(path)
 	if err != nil {
 		return nil, err
 	}
@@ -143,8 +144,8 @@ func LoadAndValidate(path string) (*Plugin, error) {
 	return p, nil
 }
 
-// Load loads a Falcosecurity plugin from the dynamic library present in the
-// local filesystem at the given path. If successful, returns a *Plugin
+// NewPlugin loads a Falcosecurity plugin from the dynamic library present in
+// the local filesystem at the given path. If successful, returns a *Plugin
 // representing the loaded plugin and a nil error. Otherwise, returns a non-nil
 // error containing the failure condition.
 //
@@ -157,9 +158,9 @@ func LoadAndValidate(path string) (*Plugin, error) {
 // plugins that are either corrupted or developed towards an older API version.
 // This can be useful to inspect static descriptive data of those plugins too,
 // such as the name or the version.
-func Load(path string) (*Plugin, error) {
+func NewPlugin(path string) (*Plugin, error) {
 	// load library
-	errBuf := (*C.char)(C.malloc(C.uint64_t(C.__plugin_max_errlen) * C.sizeof_char))
+	errBuf := (*C.char)(C.malloc(C.size_t(C.__plugin_max_errlen) * C.sizeof_char))
 	defer C.free(unsafe.Pointer(errBuf))
 	p := &Plugin{}
 	p.handle = C.plugin_load(C.CString(path), errBuf)
@@ -225,7 +226,7 @@ func (p *Plugin) Unload() {
 
 func (p *Plugin) validate() error {
 	if !p.validated {
-		errBuf := (*C.char)(C.malloc(C.uint64_t(C.__plugin_max_errlen) * C.sizeof_char))
+		errBuf := (*C.char)(C.malloc(C.size_t(C.__plugin_max_errlen) * C.sizeof_char))
 		defer C.free(unsafe.Pointer(errBuf))
 		if !C.plugin_check_required_api_version(p.handle, errBuf) ||
 			!C.plugin_check_required_symbols(p.handle, errBuf) {
@@ -286,21 +287,22 @@ func (p *Plugin) Fields() []sdk.FieldEntry {
 // of the following conditions:
 //   - Plugin is not initialized
 //   - Plugin does not support the event sourcing capability
-//   - Plugin does not implement the plugin_list_open_params symbol
 func (p *Plugin) OpenParams() ([]sdk.OpenParam, error) {
 	p.m.Lock()
 	defer p.m.Unlock()
 	if !p.HasCapSourcing() {
 		return nil, errNoSourcingCap
 	}
-	if p.handle.api.anon0.list_open_params == nil {
-		return nil, errors.New("plugin does not implement list_open_params")
-	}
 	if p.state == nil {
 		return nil, errNotInitialized
 	}
 
-	errBuf := (*C.char)(C.malloc(C.uint64_t(C.__plugin_max_errlen) * C.sizeof_char))
+	var ret []sdk.OpenParam
+	if p.handle.api.anon0.list_open_params == nil {
+		return ret, nil
+	}
+
+	errBuf := (*C.char)(C.malloc(C.size_t(C.__plugin_max_errlen) * C.sizeof_char))
 	defer C.free(unsafe.Pointer(errBuf))
 	rc := C.ss_plugin_rc(sdk.SSPluginSuccess)
 	str := C.GoString((C.__list_open_params(&p.handle.api, unsafe.Pointer(p.state), (*C.ss_plugin_rc)(&rc))))
@@ -308,7 +310,6 @@ func (p *Plugin) OpenParams() ([]sdk.OpenParam, error) {
 		return nil, errors.New(C.GoString(errBuf))
 	}
 
-	var ret []sdk.OpenParam
 	if len(str) > 0 {
 		if err := json.Unmarshal(([]byte)(str), &ret); err != nil {
 			return nil, err
