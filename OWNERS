@@ -1,10 +1,5 @@
 approvers:
-  - leodido
-  - fntlnz
-  - kris-nova
-  - mstemm
   - leogr
-  - ldegio
   - jasondellaluce
 reviewers:
   - leodido
@@ -14,3 +9,9 @@ reviewers:
   - leogr
   - ldegio
   - jasondellaluce
+emeritus_approvers:
+  - leodido
+  - fntlnz
+  - kris-nova
+  - mstemm
+  - ldegio
