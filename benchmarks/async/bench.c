@@ -37,6 +37,13 @@ bool g_use_async;
 
 void print_help()
 {
+    printf(
+        "Usage: bench [options]\n\n"
+        "Options:\n"
+        " -h, --help    Print this usage snippet.\n"
+        " -a, --async   Run the benchmark by enabling the async extraction optimization (default: off).\n"
+        " -n <number>   The number of extraction requests performed in the benchmark (default: 10000).\n"
+        " -p <number>   The number of plugins that run the benchmark in parallel (default: 1).\n");
 }
 
 void parse_options(int argc, char** argv)
