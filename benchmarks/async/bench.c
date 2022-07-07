@@ -34,6 +34,62 @@ ss_plugin_rc plugin_extract_fields(ss_plugin_t *s, const ss_plugin_event *evt, u
 int g_parallelism;
 int g_niterations;
 bool g_use_async;
+
+void print_help()
+{
+}
+
+void parse_options(int argc, char** argv)
+{
+    g_parallelism = 1;
+    g_niterations = 10000;
+    g_use_async = false;
+    for (int i = 1; i < argc; i++)
+    {
+        if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help") )
+        {
+            print_help();
+            exit(0);
+        }
+        else if (!strcmp(argv[i], "-a") || !strcmp(argv[i], "--async") )
+        {
+            g_use_async = true;
+        }
+        else if (!strcmp(argv[i], "-p") || !strcmp(argv[i], "-n"))
+        {
+            int tmp;
+            i++;
+            if (i >= argc)
+            {
+                fprintf(stderr, "option '%s' requires a parameter\n", argv[i - 1]);
+                exit(1);
+            }
+            
+            tmp = atoi(argv[i]);
+            if (tmp <= 0)
+            {
+                fprintf(stderr, "option '%s' parameter must be a positive integer\n", argv[i - 1]);
+                exit(1);
+            }
+
+            if (!strcmp(argv[i - 1], "-p"))
+            {
+                g_parallelism = tmp;
+            }
+            else
+            {
+                g_niterations = tmp;
+            }
+        }
+        else
+        {
+            fprintf(stderr, "unrecognized option '%s'\n", argv[i]);
+            print_help();
+            exit(1);
+        }
+    }
+}
+
 int run_benchmark(void* plugin_ptr)
 {
     ss_plugin_t* plugin = (ss_plugin_t*) plugin_ptr;
@@ -74,6 +130,8 @@ int run_benchmark(void* plugin_ptr)
 
 int main(int argc, char** argv)
 {
+    parse_options(argc, argv);
+
     thrd_t* threads = (thrd_t*) malloc (sizeof(thrd_t) * g_parallelism);
     ss_plugin_t** plugins = (ss_plugin_t*) malloc (sizeof(ss_plugin_t*) * g_parallelism);
 
