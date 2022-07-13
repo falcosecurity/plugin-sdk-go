@@ -39,9 +39,9 @@ type Plugin interface {
 }
 
 func enableAsync(handle cgo.Handle) {
-	extract.StartAsync()
+	extract.StartAsync(handle)
 	hooks.SetOnBeforeDestroy(func(handle cgo.Handle) {
-		extract.StopAsync()
+		extract.StopAsync(handle)
 	})
 }
 

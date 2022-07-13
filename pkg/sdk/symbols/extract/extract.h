@@ -34,5 +34,6 @@ typedef struct async_extractor_info
 	int32_t rc;
 } async_extractor_info;
 
-async_extractor_info *async_init();
-void async_deinit();
+async_extractor_info *async_init(ss_plugin_t *s);
+async_extractor_info *async_get(ss_plugin_t *s);
+void async_deinit(ss_plugin_t *s);

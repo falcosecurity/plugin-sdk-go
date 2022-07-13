@@ -35,18 +35,24 @@ enum worker_state
 	EXIT_ACK = 3,
 };
 
-static async_extractor_info *s_async_extractor_ctx = NULL;
+// todo: make this dynamic
+static async_extractor_info* s_async_extractor_ctx[64] = { NULL };
 
-async_extractor_info *async_init()
+async_extractor_info *async_init(ss_plugin_t *s)
 {
-	s_async_extractor_ctx = (async_extractor_info *)malloc(sizeof(async_extractor_info));
-	return s_async_extractor_ctx;
+	s_async_extractor_ctx[(uint32_t) s] = (async_extractor_info *)malloc(sizeof(async_extractor_info));
+	return s_async_extractor_ctx[(uint32_t) s];
 }
 
-void async_deinit()
+async_extractor_info *async_get(ss_plugin_t *s)
 {
-	free(s_async_extractor_ctx);
-	s_async_extractor_ctx = NULL;
+	return s_async_extractor_ctx[(uint32_t) s];
+}
+
+void async_deinit(ss_plugin_t *s)
+{
+	free(s_async_extractor_ctx[(uint32_t) s]);
+	s_async_extractor_ctx[(uint32_t) s] = NULL;
 }
 
 // Defined in extract.go
@@ -64,18 +70,18 @@ static inline int32_t async_extract_request(ss_plugin_t *s,
 	// we assume worker is already in WAIT state
 
 	// Set input data
-	s_async_extractor_ctx->s = s;
-	s_async_extractor_ctx->evt = evt;
-	s_async_extractor_ctx->num_fields = num_fields;
-	s_async_extractor_ctx->fields = fields;
+	s_async_extractor_ctx[(uint32_t) s]->s = s;
+	s_async_extractor_ctx[(uint32_t) s]->evt = evt;
+	s_async_extractor_ctx[(uint32_t) s]->num_fields = num_fields;
+	s_async_extractor_ctx[(uint32_t) s]->fields = fields;
 
 	// notify data request
-	atomic_store_explicit(&s_async_extractor_ctx->lock, DATA_REQ, memory_order_seq_cst);
+	atomic_store_explicit(&s_async_extractor_ctx[(uint32_t) s]->lock, DATA_REQ, memory_order_seq_cst);
 
 	// busy-wait until worker completation
-	while (atomic_load_explicit(&s_async_extractor_ctx->lock, memory_order_seq_cst) != WAIT);
+	while (atomic_load_explicit(&s_async_extractor_ctx[(uint32_t) s]->lock, memory_order_seq_cst) != WAIT);
 
-	return s_async_extractor_ctx->rc;
+	return s_async_extractor_ctx[(uint32_t) s]->rc;
 }
 
 // This is the plugin API function. If s_async_extractor_ctx is
@@ -86,7 +92,7 @@ FALCO_PLUGIN_SDK_PUBLIC int32_t plugin_extract_fields(ss_plugin_t *s,
 							  uint32_t num_fields,
 							  ss_plugin_extract_field *fields)
 {
-	if (s_async_extractor_ctx != NULL)
+	if (s_async_extractor_ctx[(uint32_t) s] != NULL)
 	{
 		return async_extract_request(s, evt, num_fields, fields);
 	}

@@ -25,6 +25,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
+
+	"github.com/falcosecurity/plugin-sdk-go/pkg/cgo"
 )
 
 const (
@@ -40,7 +43,6 @@ const (
 )
 
 var (
-	asyncCtx     *C.async_extractor_info
 	asyncMutex   sync.Mutex
 	asyncEnabled bool  = true
 	asyncCount   int32 = 0
@@ -78,16 +80,16 @@ func Async() bool {
 // After calling StartAsync, the framework automatically shift the extraction
 // strategy from the regular C -> Go call one to the alternative worker
 // synchronization one.
-func StartAsync() {
+func StartAsync(h cgo.Handle) {
 	asyncMutex.Lock()
 	defer asyncMutex.Unlock()
 
 	asyncCount += 1
-	if !asyncAvailable() || !asyncEnabled || asyncCount > 1 {
+	if !asyncAvailable() || !asyncEnabled {
 		return
 	}
 
-	asyncCtx = C.async_init()
+	asyncCtx := C.async_init(unsafe.Pointer(h))
 	atomic.StoreInt32((*int32)(&asyncCtx.lock), state_wait)
 	go func() {
 		lock := (*int32)(&asyncCtx.lock)
@@ -132,7 +134,7 @@ func StartAsync() {
 // StopAsync deinitializes and stops the asynchronous extraction mode, and
 // undoes a single StartAsync call. It is a run-time error if StartAsync was
 // not called before calling StopAsync.
-func StopAsync() {
+func StopAsync(h cgo.Handle) {
 	asyncMutex.Lock()
 	defer asyncMutex.Unlock()
 
@@ -141,7 +143,8 @@ func StopAsync() {
 		panic("plugin-sdk-go/sdk/symbols/extract: async worker stopped without being started")
 	}
 
-	if asyncCount == 0 && asyncCtx != nil {
+	asyncCtx := C.async_get(unsafe.Pointer(h))
+	if asyncCtx != nil {
 		lock := (*int32)(&asyncCtx.lock)
 
 		for !atomic.CompareAndSwapInt32(lock, state_wait, state_exit_req) {
@@ -153,6 +156,6 @@ func StopAsync() {
 			// spin
 		}
 		asyncCtx = nil
-		C.async_deinit()
+		C.async_deinit(unsafe.Pointer(h))
 	}
 }
