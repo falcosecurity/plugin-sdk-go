@@ -21,7 +21,7 @@ OUTPUTGO    := $(OUTPUTDIR)/libgo$(NAME).a
 all: $(OUTPUT)
 
 clean:
-	@rm -f $(OUTPUTDIR)
+	@rm -fr $(OUTPUTDIR)
 
 $(OUTPUT): bench.c bench.go
 	mkdir -p $(OUTPUTDIR)
