@@ -99,6 +99,7 @@ void parse_options(int argc, char** argv)
 
 int run_benchmark(void* plugin_ptr)
 {
+    ss_plugin_rc rc;
     ss_plugin_t* plugin = (ss_plugin_t*) plugin_ptr;
     ss_plugin_extract_field e;
     e.field_id = 0;
@@ -110,20 +111,25 @@ int run_benchmark(void* plugin_ptr)
     struct timespec start;
     if (clock_gettime(CLOCK_REALTIME, &start) == -1)
     {
-      perror("clock gettime");
-      return EXIT_FAILURE;
+        perror("clock gettime");
+        return EXIT_FAILURE;
     }
 
     for (int i = 0; i < g_niterations; i++)
     {
-        plugin_extract_fields(plugin, NULL, 1, &e);
+        rc = plugin_extract_fields(plugin, NULL, 1, &e);
+        if (rc != SS_PLUGIN_SUCCESS)
+        {
+            fprintf(stderr, "plugin %ld: plugin_extract_fields failure: %d\n", (uint64_t) plugin_ptr, rc);
+            return EXIT_FAILURE;
+        }
     }
 
     struct timespec stop;
     if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
     {
-      perror("clock gettime");
-      return EXIT_FAILURE;
+        perror("clock gettime");
+        return EXIT_FAILURE;
     }
 
     int64_t time_ns = (int64_t)(stop.tv_nsec - start.tv_nsec) + (int64_t)(stop.tv_sec - start.tv_sec) * SEC_TO_NS;
