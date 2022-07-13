@@ -27,12 +27,27 @@ limitations under the License.
 #define FALCO_PLUGIN_SDK_PUBLIC
 #endif
 
+// This enumerates the states of the shared lock between the C and the Go worlds.
+// At a given time, there can be multiple C consumers requesting the extraction of
+// 1+ fields, and one Go worker that synchronizes with the consumers through
+// the shared lock, resolving one request per time.
 enum worker_state
 {
-	WAIT = 0,
-	DATA_REQ = 1,
-	EXIT_REQ = 2,
-	EXIT_ACK = 3,
+	// the worker is free and there is no on-going consumer request
+	IDLE     = 0,
+	// a request is accepted and the worker is waiting for the consumer to
+	// confirm by sending the request type and its data
+	WAIT     = 1,
+	// the consumer sent a data request and the worker is resolving it
+	REQ_DATA = 2,
+	// the worker sent a response to a data request and the consumer is
+	// evaluating it
+	ACK_DATA = 3,
+	// the consumer sent an exit request and the worker is resolving it
+	REQ_EXIT = 4,
+	// the worker sent a response to an exit request and the consumer is
+	// evaluating it
+	ACK_EXIT = 5,
 };
 
 static async_extractor_info *s_async_extractor_ctx = NULL;
@@ -60,22 +75,34 @@ static inline int32_t async_extract_request(ss_plugin_t *s,
 											uint32_t num_fields,
 											ss_plugin_extract_field *fields)
 {
-	// Since no concurrent requests are supported,
-	// we assume worker is already in WAIT state
+	// wait until worker accepts our request
+	enum worker_state old_val = IDLE;
+	while (!atomic_compare_exchange_weak_explicit(
+			&s_async_extractor_ctx->lock,
+			(int32_t *) &old_val,
+			WAIT,
+			memory_order_seq_cst,
+			memory_order_relaxed))
+    {
+        old_val = IDLE;
+    }
 
-	// Set input data
+	// prepare input and send data request
 	s_async_extractor_ctx->s = s;
 	s_async_extractor_ctx->evt = evt;
 	s_async_extractor_ctx->num_fields = num_fields;
 	s_async_extractor_ctx->fields = fields;
-
-	// notify data request
-	atomic_store_explicit(&s_async_extractor_ctx->lock, DATA_REQ, memory_order_seq_cst);
+	s_async_extractor_ctx->rc = SS_PLUGIN_FAILURE;
+	atomic_store_explicit(&s_async_extractor_ctx->lock, REQ_DATA, memory_order_seq_cst);
 
 	// busy-wait until worker completation
-	while (atomic_load_explicit(&s_async_extractor_ctx->lock, memory_order_seq_cst) != WAIT);
+	while (atomic_load_explicit(&s_async_extractor_ctx->lock, memory_order_seq_cst) != ACK_DATA);
 
-	return s_async_extractor_ctx->rc;
+	// read result code and free-up the worker
+	int32_t rc = s_async_extractor_ctx->rc;
+
+	atomic_store_explicit(&s_async_extractor_ctx->lock, IDLE, memory_order_seq_cst);
+	return rc;
 }
 
 // This is the plugin API function. If s_async_extractor_ctx is

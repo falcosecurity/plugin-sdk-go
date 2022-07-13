@@ -28,10 +28,12 @@ import (
 )
 
 const (
-	state_wait = iota
-	state_data_req
-	state_exit_req
-	state_exit_ack
+	state_idle = iota
+	state_wait
+	state_req_data
+	state_ack_data
+	state_req_exit
+	state_ack_exit
 )
 
 const (
@@ -88,7 +90,7 @@ func StartAsync() {
 	}
 
 	asyncCtx = C.async_init()
-	atomic.StoreInt32((*int32)(&asyncCtx.lock), state_wait)
+	atomic.StoreInt32((*int32)(&asyncCtx.lock), state_idle)
 	go func() {
 		lock := (*int32)(&asyncCtx.lock)
 		waitStartTime := time.Now().UnixNano()
@@ -97,7 +99,7 @@ func StartAsync() {
 			// Check for incoming request, if any, otherwise busy waits
 			switch atomic.LoadInt32(lock) {
 
-			case state_data_req:
+			case state_req_data:
 				// Incoming data request. Process it...
 				asyncCtx.rc = C.int32_t(
 					plugin_extract_fields_sync(
@@ -108,13 +110,13 @@ func StartAsync() {
 					),
 				)
 				// Processing done, return back to waiting state
-				atomic.StoreInt32(lock, state_wait)
+				atomic.StoreInt32(lock, state_ack_data)
 				// Reset waiting start time
 				waitStartTime = 0
 
-			case state_exit_req:
+			case state_req_exit:
 				// Incoming exit request. Send ack and exit.
-				atomic.StoreInt32(lock, state_exit_ack)
+				atomic.StoreInt32(lock, state_ack_exit)
 				return
 
 			default:
@@ -144,14 +146,24 @@ func StopAsync() {
 	if asyncCount == 0 && asyncCtx != nil {
 		lock := (*int32)(&asyncCtx.lock)
 
-		for !atomic.CompareAndSwapInt32(lock, state_wait, state_exit_req) {
+		// wait until worker accepts our request (just like we would do from
+		// a C consumer)
+		for !atomic.CompareAndSwapInt32(lock, state_idle, state_wait) {
 			// spin
 		}
 
-		// state_exit_req acquired, wait for worker exiting
-		for atomic.LoadInt32(lock) != state_exit_ack {
+		// send exit request
+		atomic.StoreInt32(lock, state_req_exit)
+
+		// busy-wait until worker completation
+		for atomic.LoadInt32(lock) != state_ack_exit {
 			// spin
 		}
+
+		// free-up worker (for consistency, since it probably already exited)
+		atomic.StoreInt32(lock, state_idle)
+
+		// de-initialize worker context
 		asyncCtx = nil
 		C.async_deinit()
 	}
