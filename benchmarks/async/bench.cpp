@@ -14,28 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+#define __STDC_FORMAT_MACROS
+
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <threads.h>
 #include <unistd.h>
+#include <chrono>
+#include <thread>
+#include <vector>
+#include <string>
 
 #include "../../pkg/sdk/plugin_info.h"
 
-#define SEC_TO_NS  1000000000L;
+// defined in Go and exported from bench.go
+extern "C"
+{
+    void plugin_destroy(ss_plugin_t*);
+    ss_plugin_t* plugin_init(const char*, ss_plugin_rc*);
+    ss_plugin_rc plugin_extract_fields(ss_plugin_t*, const ss_plugin_event*, uint32_t, ss_plugin_extract_field*);
+}
 
-// defined and exported in bench.go
-void plugin_destroy(ss_plugin_t *s);
-ss_plugin_t* plugin_init(const char *config, ss_plugin_rc *rc);
-ss_plugin_rc plugin_extract_fields(ss_plugin_t *s, const ss_plugin_event *evt, uint32_t num_fields, ss_plugin_extract_field *fields);
+// global benchmark options
+static int g_parallelism;
+static int g_niterations;
+static bool g_use_async;
 
-// benchmark options
-int g_parallelism;
-int g_niterations;
-bool g_use_async;
-
-void print_help()
+static void print_help()
 {
     printf(
         "Usage: bench [options]\n\n"
@@ -46,40 +49,42 @@ void print_help()
         " -p <number>   The number of plugins that run the benchmark in parallel (default: 1).\n");
 }
 
-void parse_options(int argc, char** argv)
+static void parse_options(int argc, char** argv)
 {
     g_parallelism = 1;
     g_niterations = 10000;
     g_use_async = false;
+
     for (int i = 1; i < argc; i++)
     {
-        if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help") )
+        auto arg = std::string(argv[i]);
+        if (arg == "-h" || arg == "--help" )
         {
             print_help();
             exit(0);
         }
-        else if (!strcmp(argv[i], "-a") || !strcmp(argv[i], "--async") )
+        else if (arg == "-a" || arg == "--async" )
         {
             g_use_async = true;
         }
-        else if (!strcmp(argv[i], "-p") || !strcmp(argv[i], "-n"))
+        else if (arg == "-p" || arg == "-n")
         {
             int tmp;
             i++;
             if (i >= argc)
             {
-                fprintf(stderr, "option '%s' requires a parameter\n", argv[i - 1]);
+                fprintf(stderr, "option '%s' requires a parameter\n", arg.c_str());
                 exit(1);
             }
             
             tmp = atoi(argv[i]);
             if (tmp <= 0)
             {
-                fprintf(stderr, "option '%s' parameter must be a positive integer\n", argv[i - 1]);
+                fprintf(stderr, "option '%s' parameter must be a positive integer\n", arg.c_str());
                 exit(1);
             }
 
-            if (!strcmp(argv[i - 1], "-p"))
+            if (arg == "-p")
             {
                 g_parallelism = tmp;
             }
@@ -97,72 +102,66 @@ void parse_options(int argc, char** argv)
     }
 }
 
-int run_benchmark(void* plugin_ptr)
+static void benchmark(ss_plugin_t *plugin) noexcept
 {
-    ss_plugin_rc rc;
-    ss_plugin_t* plugin = (ss_plugin_t*) plugin_ptr;
+    // craft a mock extract request
     ss_plugin_extract_field e;
     e.field_id = 0;
     e.field = "sample.field";
     e.arg_present = false;
     e.ftype = FTYPE_UINT64;
     e.flist = false;
-
-    struct timespec start;
-    if (clock_gettime(CLOCK_REALTIME, &start) == -1)
-    {
-        perror("clock gettime");
-        return EXIT_FAILURE;
-    }
-
+    
+    // request multiple extractions and compute total execution time
+    auto start = std::chrono::high_resolution_clock::now();
+    ss_plugin_rc rc = SS_PLUGIN_FAILURE;
     for (int i = 0; i < g_niterations; i++)
     {
         rc = plugin_extract_fields(plugin, NULL, 1, &e);
         if (rc != SS_PLUGIN_SUCCESS)
         {
-            fprintf(stderr, "plugin %ld: plugin_extract_fields failure: %d\n", (uint64_t) plugin_ptr, rc);
-            return EXIT_FAILURE;
+            fprintf(stderr, "plugin %" PRIu64 ": plugin_extract_fields failure: %d\n", (uint64_t) plugin, rc);
+            return;
         }
     }
+    auto end = std::chrono::high_resolution_clock::now();
 
-    struct timespec stop;
-    if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
-    {
-        perror("clock gettime");
-        return EXIT_FAILURE;
-    }
-
-    int64_t time_ns = (int64_t)(stop.tv_nsec - start.tv_nsec) + (int64_t)(stop.tv_sec - start.tv_sec) * SEC_TO_NS;
-    printf("plugin %ld: %.02f ns/extraction (elapsed time %ldns, extractions %d)\n",
-        (uint64_t) plugin_ptr,
-        (double) time_ns / (double) (g_niterations),
-        time_ns,
+    // print stats summary
+    auto time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+    printf("plugin %" PRIu64 ": %.02f ns/extraction (elapsed time %" PRIu64 "ns, extractions %d)\n",
+        (uint64_t) plugin,
+        (double) time_ns.count() / (double) (g_niterations),
+        (uint64_t) time_ns.count(),
         g_niterations);
-    return 0;
 }
 
 int main(int argc, char** argv)
 {
+    // parse user options
     parse_options(argc, argv);
 
-    thrd_t* threads = (thrd_t*) malloc (sizeof(thrd_t) * g_parallelism);
-    ss_plugin_t** plugins = (ss_plugin_t*) malloc (sizeof(ss_plugin_t*) * g_parallelism);
-
+    // initialize plugins and launch a benchmark for each of them in parallel
+    std::vector<std::thread> threads;
+    std::vector<ss_plugin_t*> plugins;
     for (int i = 0; i < g_parallelism; ++i)
     {
-        ss_plugin_rc rc = SS_PLUGIN_SUCCESS;
-        plugins[i] = plugin_init(g_use_async ? "async" : "", &rc);
+        ss_plugin_rc rc = SS_PLUGIN_FAILURE;
+        plugins.push_back(plugin_init(g_use_async ? "async" : "", &rc));
         if (rc != SS_PLUGIN_SUCCESS)
         {
             fprintf(stderr, "can't initialize plugin");
             exit(1);
         }
-        thrd_create(&threads[i], run_benchmark, (void*) plugins[i]);
+        threads.push_back(std::thread(benchmark, plugins[i]));
     }
 
+    // wait for all banchmarks to finish and destroy plugins
     for (int i = 0; i < g_parallelism; ++i)
     {
-        thrd_join(threads[i], NULL);
+        if (threads[i].joinable())
+        {
+            threads[i].join();
+        }
         plugin_destroy(plugins[i]);
     }
 

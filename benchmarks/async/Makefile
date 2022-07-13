@@ -23,7 +23,7 @@ all: $(OUTPUT)
 clean:
 	@rm -fr $(OUTPUTDIR)
 
-$(OUTPUT): bench.c bench.go
+$(OUTPUT): bench.cpp bench.go
 	mkdir -p $(OUTPUTDIR)
 	GODEBUG=cgocheck=2 $(GO) build -buildmode=c-archive -o $(OUTPUTGO) bench.go
-	$(CC) bench.c $(OUTPUTGO) -pthread -o $(OUTPUT)
+	$(CXX) bench.cpp $(OUTPUTGO) -std=c++11 -pthread -o $(OUTPUT)
