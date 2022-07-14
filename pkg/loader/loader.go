@@ -128,9 +128,9 @@ type Plugin struct {
 	validErr   error
 }
 
-// NewValidPlugin is the same as NewPlugin(), but returns an error if the loaded
-// plugin is not valid. It is equivalent to invoking NewPlugin() and
-// Plugin.Validate() in sequence.
+// NewValidPlugin is the same as NewPlugin(), but returns an error if
+// the loaded plugin is not valid. It is equivalent to invoking NewPlugin()
+// and Plugin.Validate() in sequence.
 func NewValidPlugin(path string) (*Plugin, error) {
 	p, err := NewPlugin(path)
 	if err != nil {
@@ -145,14 +145,15 @@ func NewValidPlugin(path string) (*Plugin, error) {
 }
 
 // NewPlugin loads a Falcosecurity plugin from the dynamic library present in
-// the local filesystem at the given path. If successful, returns a *Plugin
-// representing the loaded plugin and a nil error. Otherwise, returns a non-nil
-// error containing the failure condition.
+// the local filesystem at the given path. If successful, returns a
+// *loader.Plugin representing the loaded plugin and a nil error.
+// Otherwise, returns a non-nil error containing the failure condition.
 //
 // Although this reads the content of the dynamic library, this does not check
 // that the returned Plugin is valid and complies to the currently supported
-// plugin API version. Refer to the Plugin.Validate() function for performing
-// validation checks of this kind.
+// plugin API version. This does not initialize the plugin either.
+// For those purposes, refer to the Validate() and Init() functions of the
+// returned *loader.Plugin.
 //
 // Separating the loading step from the validation one allows developers to open
 // plugins that are either corrupted or developed towards an older API version.
@@ -230,10 +231,12 @@ func (p *Plugin) validate() error {
 		defer C.free(unsafe.Pointer(errBuf))
 		if !C.plugin_check_required_api_version(p.handle, errBuf) ||
 			!C.plugin_check_required_symbols(p.handle, errBuf) {
-			return errors.New(C.GoString(errBuf))
+			p.validErr = errors.New(C.GoString(errBuf))
+			return p.validErr
 		}
 		if p.caps == C.CAP_NONE {
-			return errors.New("plugin supports no capability")
+			p.validErr = errors.New("plugin supports no capability")
+			return p.validErr
 		}
 		p.validated = true
 	}
@@ -283,8 +286,8 @@ func (p *Plugin) Fields() []sdk.FieldEntry {
 }
 
 // OpenParams implements the sdk.OpenParams interface.
-// Returns a list of suggested open parameters. Returns a non-nil error in one
-// of the following conditions:
+// Returns a list of suggested open parameters.
+// Returns a non-nil error in one of the following conditions:
 //   - Plugin is not initialized
 //   - Plugin does not support the event sourcing capability
 func (p *Plugin) OpenParams() ([]sdk.OpenParam, error) {
@@ -319,11 +322,17 @@ func (p *Plugin) OpenParams() ([]sdk.OpenParam, error) {
 }
 
 // Init initializes this plugin with a given config string. A successful call
-// to init returns a nil error. If the plugin supports an init config schema
-// (e.g. Plugin.InitSchema returns a non-nil value), the config string is
-// validated with the schema and a non-nil error is returned for validation
-// failures. Invoking Init() multiple times returns an error. Once initalized,
-// the plugin gets destroyed when calling Unload().
+// to init returns a nil error.
+//
+// If the plugin supports an init config schema (e.g. Plugin.InitSchema
+// returns a non-nil value), the config string is validated with the schema
+// and a non-nil error is returned for validation failures.
+//
+// The plugin get validated before getting initialized, and a non-nil error is
+// returned in case of validation errors. Invoking Init() multiple times on
+// the same plugin returns an error.
+//
+// Once initalized, the plugin gets destroyed when calling Unload().
 func (p *Plugin) Init(config string) error {
 	p.m.Lock()
 	defer p.m.Unlock()
@@ -353,7 +362,7 @@ func (p *Plugin) Init(config string) error {
 	return errors.New("unknown initialization error")
 }
 
-// only json schemas are supported for now
+// todo(jasondellaluce): change this once we support other schema formats
 func (p *Plugin) validateInitConfig(config string) (string, error) {
 	if p.initSchema != nil {
 		if len(config) == 0 {
