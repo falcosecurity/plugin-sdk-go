@@ -17,14 +17,14 @@ limitations under the License.
 package sdk
 
 /*
-#include "plugin_info.h"
+#include "plugin_types.h"
 #include <stdlib.h>
 #include <string.h>
 
 // NOTE: This is just an replica of the anonymous union nested inside
 // ss_plugin_extract_field. The only difference is that each union field has
 // one pointer level less than its equivalent of ss_plugin_extract_field.
-// Keep this in sync with plugin_info.h in case new types will be supported.
+// Keep this in sync with plugin_types.h in case new types will be supported.
 typedef union {
 	const char* str;
 	uint64_t u64;

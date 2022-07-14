@@ -32,8 +32,7 @@ limitations under the License.
 // on the returned sdk.StringBuffer. Finally, the function deletes the
 // s cgo.Handle.
 //
-// This function is part of the source_plugin_info and extractor_plugin_info
-// interfaces as defined in plugin_info.h.
+// This function is part of the plugin_api interface as defined in plugin_api.h.
 // In almost all cases, your plugin should import this module, unless your
 // plugin exports those symbols by other means.
 package initialize

@@ -23,7 +23,7 @@ limitations under the License.
 #include <vector>
 #include <string>
 
-#include "../../pkg/sdk/plugin_info.h"
+#include "../../pkg/sdk/plugin_types.h"
 
 // defined in Go and exported from bench.go
 extern "C"

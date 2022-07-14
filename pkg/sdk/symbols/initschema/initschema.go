@@ -17,14 +17,13 @@ limitations under the License.
 // This package exports the following C function:
 // - const char* get_init_schema(ss_plugin_schema_type* schema_type)
 //
-// This function is part of the source_plugin_info and extractor_plugin_info
-// interfaces as defined in plugin_info.h.
+// This function is part of the plugin_api interface as defined in plugin_api.h.
 // In almost all cases, your plugin should import this module, unless your
 // plugin exports those symbols by other means.
 package initschema
 
 /*
-#include "../../plugin_info.h"
+#include "../../plugin_types.h"
 */
 import "C"
 import (

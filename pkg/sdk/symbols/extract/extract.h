@@ -17,7 +17,7 @@ limitations under the License.
 #pragma once
 
 #include <stdatomic.h>
-#include "../../plugin_info.h"
+#include "../../plugin_types.h"
 
 typedef struct async_extractor_info
 {
