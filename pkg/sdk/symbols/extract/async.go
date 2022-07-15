@@ -21,10 +21,14 @@ package extract
 */
 import "C"
 import (
+	"reflect"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
+
+	"github.com/falcosecurity/plugin-sdk-go/pkg/cgo"
 )
 
 const (
@@ -37,6 +41,8 @@ const (
 const (
 	starvationThresholdNs = int64(1e6)
 	sleepTimeNs           = 1e7 * time.Nanosecond
+	// todo(jasondellaluce): change this if we increase the max number of handles
+	asyncCtxSize = cgo.MaxHandle + 1
 )
 
 var (
@@ -87,37 +93,43 @@ func StartAsync() {
 		return
 	}
 
-	asyncCtx = C.async_init()
-	atomic.StoreInt32((*int32)(&asyncCtx.lock), state_wait)
+	// initialize async context slots
+	var asyncCtx []C.async_extractor_info
+	(*reflect.SliceHeader)(unsafe.Pointer(&asyncCtx)).Data = uintptr(unsafe.Pointer(C.async_init((C.size_t)(asyncCtxSize))))
+	(*reflect.SliceHeader)(unsafe.Pointer(&asyncCtx)).Len = int(asyncCtxSize)
+	(*reflect.SliceHeader)(unsafe.Pointer(&asyncCtx)).Cap = int(asyncCtxSize)
+	for i := 0; i < asyncCtxSize; i++ {
+		atomic.StoreInt32((*int32)(&asyncCtx[i].lock), state_wait)
+	}
 	go func() {
-		lock := (*int32)(&asyncCtx.lock)
 		waitStartTime := time.Now().UnixNano()
-
 		for {
-			// Check for incoming request, if any, otherwise busy waits
-			switch atomic.LoadInt32(lock) {
+			// check async context slots in round-robin
+			for i := 0; i < asyncCtxSize; i++ {
+				// Check for incoming request, if any, otherwise busy waits
+				switch atomic.LoadInt32((*int32)(&asyncCtx[i].lock)) {
 
-			case state_data_req:
-				// Incoming data request. Process it...
-				asyncCtx.rc = C.int32_t(
-					plugin_extract_fields_sync(
-						C.uintptr_t(uintptr(asyncCtx.s)),
-						asyncCtx.evt,
-						uint32(asyncCtx.num_fields),
-						asyncCtx.fields,
-					),
-				)
-				// Processing done, return back to waiting state
-				atomic.StoreInt32(lock, state_wait)
-				// Reset waiting start time
-				waitStartTime = 0
+				case state_data_req:
+					// Incoming data request. Process it...
+					asyncCtx[i].rc = C.int32_t(
+						plugin_extract_fields_sync(
+							C.uintptr_t(uintptr(asyncCtx[i].s)),
+							asyncCtx[i].evt,
+							uint32(asyncCtx[i].num_fields),
+							asyncCtx[i].fields,
+						),
+					)
+					// Processing done, return back to waiting state
+					atomic.StoreInt32((*int32)(&asyncCtx[i].lock), state_wait)
+					// Reset waiting start time
+					waitStartTime = 0
 
-			case state_exit_req:
-				// Incoming exit request. Send ack and exit.
-				atomic.StoreInt32(lock, state_exit_ack)
-				return
+				case state_exit_req:
+					// Incoming exit request. Send ack and exit.
+					atomic.StoreInt32((*int32)(&asyncCtx[i].lock), state_exit_ack)
+					return
+				}
 
-			default:
 				// busy wait, then sleep after 1ms
 				if waitStartTime == 0 {
 					waitStartTime = time.Now().UnixNano()

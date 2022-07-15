@@ -37,9 +37,9 @@ enum worker_state
 
 static async_extractor_info *s_async_extractor_ctx = NULL;
 
-async_extractor_info *async_init()
+async_extractor_info *async_init(size_t size)
 {
-	s_async_extractor_ctx = (async_extractor_info *)malloc(sizeof(async_extractor_info));
+	s_async_extractor_ctx = (async_extractor_info *)malloc(sizeof(async_extractor_info) * size);
 	return s_async_extractor_ctx;
 }
 
@@ -60,22 +60,29 @@ static inline int32_t async_extract_request(ss_plugin_t *s,
 											uint32_t num_fields,
 											ss_plugin_extract_field *fields)
 {
-	// Since no concurrent requests are supported,
-	// we assume worker is already in WAIT state
+	// note: concurrent requests are supported on the context info, but each
+	// slot with a different value of ss_plugin_t *s. As such, for each lock
+	// we assume worker is already in WAIT state. This is possible because
+	// ss_plugin_t *s is an integer number representing a cgo.Handle, and can
+	// have values in the range of [0, cgo.MaxHandle]
+	//
+	// todo(jasondellaluce): this is dependent on the implementation of our
+	// cgo.Handle to optimize performance, so change this if we ever change
+	// how cgo.Handles are represented
 
 	// Set input data
-	s_async_extractor_ctx->s = s;
-	s_async_extractor_ctx->evt = evt;
-	s_async_extractor_ctx->num_fields = num_fields;
-	s_async_extractor_ctx->fields = fields;
+	s_async_extractor_ctx[(size_t) s].s = s;
+	s_async_extractor_ctx[(size_t) s].evt = evt;
+	s_async_extractor_ctx[(size_t) s].num_fields = num_fields;
+	s_async_extractor_ctx[(size_t) s].fields = fields;
 
 	// notify data request
-	atomic_store_explicit(&s_async_extractor_ctx->lock, DATA_REQ, memory_order_seq_cst);
+	atomic_store_explicit(&s_async_extractor_ctx[(size_t) s].lock, DATA_REQ, memory_order_seq_cst);
 
 	// busy-wait until worker completation
-	while (atomic_load_explicit(&s_async_extractor_ctx->lock, memory_order_seq_cst) != WAIT);
+	while (atomic_load_explicit(&s_async_extractor_ctx[(size_t) s].lock, memory_order_seq_cst) != WAIT);
 
-	return s_async_extractor_ctx->rc;
+	return s_async_extractor_ctx[(size_t) s].rc;
 }
 
 // This is the plugin API function. If s_async_extractor_ctx is
