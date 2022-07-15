@@ -88,6 +88,9 @@ var (
 	asyncCtxBatchLen = int32(0)
 )
 
+// todo: find a way to make this dynamic
+const maxWorkers = 1
+
 // SetAsync enables or disables the async extraction optimization depending
 // on the passed-in boolean. Note, setting the optimization as enabled does not
 // guarantee that it will be used at runtime: the optimization will not
@@ -135,11 +138,11 @@ func destroyAsyncCtxBatch() {
 	C.async_deinit()
 }
 
-func asyncWorker() {
+func asyncWorker(workerIdx int32) {
 	waitStartTime := time.Now().UnixNano()
 	for {
 		// check async context slots in round-robin
-		for i := int32(0); i < atomic.LoadInt32(&asyncCtxBatchLen); i++ {
+		for i := int32(workerIdx); i < atomic.LoadInt32(&asyncCtxBatchLen); i += maxWorkers {
 			// Check for incoming request, if any, otherwise busy waits
 			switch atomic.LoadInt32((*int32)(&asyncCtxBatch[i].lock)) {
 
@@ -174,15 +177,17 @@ func asyncWorker() {
 	}
 }
 
-func stopAsync() {
-	for !atomic.CompareAndSwapInt32((*int32)(&asyncCtxBatch[0].lock), state_wait, state_exit_req) {
+func stopAsync(workerIdx int32) {
+	for !atomic.CompareAndSwapInt32((*int32)(&asyncCtxBatch[workerIdx].lock), state_wait, state_exit_req) {
 		// spin
 	}
 
 	// state_exit_req acquired, wait for worker exiting
-	for atomic.LoadInt32((*int32)(&asyncCtxBatch[0].lock)) != state_exit_ack {
+	for atomic.LoadInt32((*int32)(&asyncCtxBatch[workerIdx].lock)) != state_exit_ack {
 		// spin
 	}
+
+	atomic.StoreInt32((*int32)(&asyncCtxBatch[workerIdx].lock), state_wait)
 }
 
 // StartAsync initializes and starts the asynchronous extraction mode.
@@ -211,12 +216,16 @@ func StartAsync() {
 
 	asyncCount += 1
 	atomic.AddInt32(&asyncCtxBatchLen, 1)
-	if !asyncAvailable() || !asyncEnabled || asyncCount > 1 {
+	if !asyncAvailable() || !asyncEnabled {
 		return
 	}
 
-	initAsyncCtxBatch()
-	go asyncWorker()
+	if asyncCount == 1 {
+		initAsyncCtxBatch()
+	}
+	if asyncCount <= maxWorkers {
+		go asyncWorker(asyncCount - 1)
+	}
 }
 
 // StopAsync deinitializes and stops the asynchronous extraction mode, and
@@ -231,8 +240,10 @@ func StopAsync() {
 		panic("plugin-sdk-go/sdk/symbols/extract: async worker stopped without being started")
 	}
 
-	if asyncCount == 0 && asyncCtxBatch != nil {
-		stopAsync()
+	if asyncCtxBatch != nil && asyncCount == 0 {
+		for i := int32(0); i < maxWorkers && i < asyncCtxBatchLen; i++ {
+			stopAsync(i)
+		}
 		destroyAsyncCtxBatch()
 	}
 }
