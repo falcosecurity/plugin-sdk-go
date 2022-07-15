@@ -71,18 +71,18 @@ static inline int32_t async_extract_request(ss_plugin_t *s,
 	// how cgo.Handles are represented
 
 	// Set input data
-	s_async_extractor_ctx[(size_t) s].s = s;
-	s_async_extractor_ctx[(size_t) s].evt = evt;
-	s_async_extractor_ctx[(size_t) s].num_fields = num_fields;
-	s_async_extractor_ctx[(size_t) s].fields = fields;
+	s_async_extractor_ctx[(size_t) s - 1].s = s;
+	s_async_extractor_ctx[(size_t) s - 1].evt = evt;
+	s_async_extractor_ctx[(size_t) s - 1].num_fields = num_fields;
+	s_async_extractor_ctx[(size_t) s - 1].fields = fields;
 
 	// notify data request
-	atomic_store_explicit(&s_async_extractor_ctx[(size_t) s].lock, DATA_REQ, memory_order_seq_cst);
+	atomic_store_explicit(&s_async_extractor_ctx[(size_t) s - 1].lock, DATA_REQ, memory_order_seq_cst);
 
 	// busy-wait until worker completation
-	while (atomic_load_explicit(&s_async_extractor_ctx[(size_t) s].lock, memory_order_seq_cst) != WAIT);
+	while (atomic_load_explicit(&s_async_extractor_ctx[(size_t) s - 1].lock, memory_order_seq_cst) != WAIT);
 
-	return s_async_extractor_ctx[(size_t) s].rc;
+	return s_async_extractor_ctx[(size_t) s - 1].rc;
 }
 
 // This is the plugin API function. If s_async_extractor_ctx is

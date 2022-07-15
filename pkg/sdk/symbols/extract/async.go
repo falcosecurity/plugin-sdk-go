@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2021 The Falco Authors.
+Copyright (C) 2022 The Falco Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -85,7 +85,7 @@ var (
 	// and its cgo.Handle deleted. We can assume already-assigned cgo.Handles
 	// to be reuased after deletion, but we can't make assumptions on which
 	// is the largest cgo.Handle used in a given moment.
-	asyncCtxBatchLen = uint32(0)
+	asyncCtxBatchLen = int32(0)
 )
 
 // SetAsync enables or disables the async extraction optimization depending
@@ -131,7 +131,7 @@ func initAsyncCtxBatch() {
 
 func destroyAsyncCtxBatch() {
 	asyncCtxBatch = nil
-	atomic.StoreUint32(&asyncCtxBatchLen, 0)
+	atomic.StoreInt32(&asyncCtxBatchLen, 0)
 	C.async_deinit()
 }
 
@@ -139,7 +139,7 @@ func asyncWorker() {
 	waitStartTime := time.Now().UnixNano()
 	for {
 		// check async context slots in round-robin
-		for i := uint32(1); i < atomic.LoadUint32(&asyncCtxBatchLen)+1; i++ {
+		for i := int32(0); i < atomic.LoadInt32(&asyncCtxBatchLen); i++ {
 			// Check for incoming request, if any, otherwise busy waits
 			switch atomic.LoadInt32((*int32)(&asyncCtxBatch[i].lock)) {
 
@@ -175,12 +175,12 @@ func asyncWorker() {
 }
 
 func stopAsync() {
-	for !atomic.CompareAndSwapInt32((*int32)(&asyncCtxBatch[1].lock), state_wait, state_exit_req) {
+	for !atomic.CompareAndSwapInt32((*int32)(&asyncCtxBatch[0].lock), state_wait, state_exit_req) {
 		// spin
 	}
 
 	// state_exit_req acquired, wait for worker exiting
-	for atomic.LoadInt32((*int32)(&asyncCtxBatch[1].lock)) != state_exit_ack {
+	for atomic.LoadInt32((*int32)(&asyncCtxBatch[0].lock)) != state_exit_ack {
 		// spin
 	}
 }
@@ -210,7 +210,7 @@ func StartAsync() {
 	defer asyncMutex.Unlock()
 
 	asyncCount += 1
-	atomic.AddUint32(&asyncCtxBatchLen, 1)
+	atomic.AddInt32(&asyncCtxBatchLen, 1)
 	if !asyncAvailable() || !asyncEnabled || asyncCount > 1 {
 		return
 	}
