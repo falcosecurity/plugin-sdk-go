@@ -22,14 +22,13 @@ limitations under the License.
 // the sdk.PluginState interface. The value of the h handle must implement
 // the sdk.Events and the sdk.NextBatcher interfaces.
 //
-// This function is part of the source_plugin_info interface as defined in
-// plugin_info.h.
+// This function is part of the plugin_api interface as defined in plugin_api.h.
 // In almost all cases, your plugin should import this module, unless your
 // plugin exports those symbols by other means.
 package nextbatch
 
 /*
-#include "../../plugin_info.h"
+#include "../../plugin_types.h"
 */
 import "C"
 import (

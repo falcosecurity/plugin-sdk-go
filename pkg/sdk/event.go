@@ -18,7 +18,7 @@ package sdk
 
 /*
 #include <stdlib.h>
-#include "plugin_info.h"
+#include "plugin_types.h"
 */
 import "C"
 import (
