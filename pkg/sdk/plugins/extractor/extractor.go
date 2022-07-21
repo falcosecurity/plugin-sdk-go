@@ -38,10 +38,22 @@ type Plugin interface {
 	Fields() []sdk.FieldEntry
 }
 
+// note: here the plugin Init method might have
+// called extract.SetAsync, which influences whether the async optimization
+// will be actually used or not. Potentially, extract.SetAsync might be
+// invoked with different boolean values at subsequent plugin initializations,
+// however this code is still safe since:
+//   - Init methods are called in sequence and not concurrently. As such,
+//     every plugin invoking extract.SetAsync influences behavior of
+//     extract.StartAsync only for itself.
+//   - The hooks.SetOnBeforeDestroy callback is idempotent, because
+//     extract.StopAsync works without having context on whether the current
+//     plugin actually used the async optimization. Hence, extract.StopAsync
+//     is not influenced by the invocations of extract.SetAsync.
 func enableAsync(handle cgo.Handle) {
-	extract.StartAsync()
+	extract.StartAsync(handle)
 	hooks.SetOnBeforeDestroy(func(handle cgo.Handle) {
-		extract.StopAsync()
+		extract.StopAsync(handle)
 	})
 }
 
