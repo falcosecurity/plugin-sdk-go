@@ -37,9 +37,9 @@ enum worker_state
 
 static async_extractor_info *s_async_extractor_ctx = NULL;
 
-async_extractor_info *async_init()
+async_extractor_info *async_init(size_t size)
 {
-	s_async_extractor_ctx = (async_extractor_info *)malloc(sizeof(async_extractor_info));
+	s_async_extractor_ctx = (async_extractor_info *)malloc(sizeof(async_extractor_info) * size);
 	return s_async_extractor_ctx;
 }
 
