@@ -29,10 +29,11 @@ limitations under the License.
 
 enum worker_state
 {
-	WAIT = 0,
-	DATA_REQ = 1,
-	EXIT_REQ = 2,
-	EXIT_ACK = 3,
+	UNUSED   = 0,
+	WAIT     = 1,
+	DATA_REQ = 2,
+	EXIT_REQ = 3,
+	EXIT_ACK = 4,
 };
 
 static async_extractor_info *s_async_ctx_batch = NULL;
@@ -55,10 +56,13 @@ extern int32_t plugin_extract_fields_sync(ss_plugin_t *s,
 										  uint32_t num_fields,
 										  ss_plugin_extract_field *fields);
 
-static inline int32_t async_extract_request(ss_plugin_t *s,
-											const ss_plugin_event *evt,
-											uint32_t num_fields,
-											ss_plugin_extract_field *fields)
+// This is the plugin API function. If s_async_ctx_batch is
+// non-NULL, it calls the async extractor function. Otherwise, it
+// calls the synchronous extractor function.
+FALCO_PLUGIN_SDK_PUBLIC int32_t plugin_extract_fields(ss_plugin_t *s,
+							  const ss_plugin_event *evt,
+							  uint32_t num_fields,
+							  ss_plugin_extract_field *fields)
 {
 	// note: concurrent requests are supported on the context batch, but each
 	// slot with a different value of ss_plugin_t *s. As such, for each lock
@@ -69,6 +73,13 @@ static inline int32_t async_extract_request(ss_plugin_t *s,
 	// todo(jasondellaluce): this is dependent on the implementation of our
 	// cgo.Handle to optimize performance, so change this if we ever change
 	// how cgo.Handles are represented
+	
+	// if async optimization is not available, go with a simple C -> Go call
+	if (s_async_ctx_batch == NULL
+		|| atomic_load_explicit(&s_async_ctx_batch[(size_t)s - 1].lock, memory_order_seq_cst) != WAIT)
+	{
+		return plugin_extract_fields_sync(s, evt, num_fields, fields);
+	}
 
 	// Set input data
 	s_async_ctx_batch[(size_t)s - 1].s = s;
@@ -83,20 +94,4 @@ static inline int32_t async_extract_request(ss_plugin_t *s,
 	while (atomic_load_explicit(&s_async_ctx_batch[(size_t)s - 1].lock, memory_order_seq_cst) != WAIT);
 
 	return s_async_ctx_batch[(size_t)s - 1].rc;
-}
-
-// This is the plugin API function. If s_async_ctx_batch is
-// non-NULL, it calls the async extractor function. Otherwise, it
-// calls the synchronous extractor function.
-FALCO_PLUGIN_SDK_PUBLIC int32_t plugin_extract_fields(ss_plugin_t *s,
-							  const ss_plugin_event *evt,
-							  uint32_t num_fields,
-							  ss_plugin_extract_field *fields)
-{
-	if (s_async_ctx_batch != NULL)
-	{
-		return async_extract_request(s, evt, num_fields, fields);
-	}
-
-	return plugin_extract_fields_sync(s, evt, num_fields, fields);
 }
