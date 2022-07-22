@@ -22,6 +22,7 @@ package extract
 import "C"
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"runtime"
 	"sync"
@@ -115,9 +116,12 @@ var (
 	//
 	asyncCtxBatch []C.async_extractor_info
 	//
+	// maxWorkers is the max number of workers that can be active at the same time
+	maxWorkers = int32(1)
+	//
 	// activeWorkers entries are true if an async worker is currently active
 	// at the given index. The size of activeWorkers is maxWorkers.
-	activeWorkers = [maxWorkers]bool{}
+	activeWorkers = []bool{}
 	//
 	// maxBatchIdx is the greatest slot index occupied in the batch.
 	// This value is >= 0 and < asyncCtxBatchCap. This is used by async workers
@@ -125,10 +129,6 @@ var (
 	// minimize the synchronization overhead.
 	maxBatchIdx = int32(0)
 )
-
-// maxWorkers is the max number of workers that can be active at the same time
-// TODO: make this configurable and thread-safe
-const maxWorkers = int32(3)
 
 // SetAsync enables or disables the async extraction optimization depending
 // on the passed-in boolean.
@@ -162,11 +162,6 @@ func initAsyncCtxBatch() {
 		atomic.StoreInt32((*int32)(&asyncCtxBatch[i].lock), state_unused)
 	}
 
-	// no worker is active at the beginning
-	for i := int32(0); i < maxWorkers; i++ {
-		activeWorkers[i] = false
-	}
-
 	// no batch index is used at the beginning
 	atomic.StoreInt32(&maxBatchIdx, 0)
 }
@@ -194,11 +189,15 @@ func handleToBatchIdx(h cgo.Handle) int32 {
 	return int32(h) - 1
 }
 
+func getMaxWorkers(maxProcs int) int32 {
+	return int32(math.Ceil(math.Log2(float64(maxProcs))))
+}
+
 func startWorker(workerIdx int32) {
 	waitStartTime := time.Now().UnixNano()
 	batchIdxs := workerIdxToBatchIdxs(workerIdx)
 	for {
-		// ;oop over async context batch slots in round-robin
+		// loop over async context batch slots in round-robin
 		for _, i := range batchIdxs {
 			// reduce sync overhead by skipping unused batch slots
 			if i > maxBatchIdx {
@@ -313,9 +312,17 @@ func StartAsync(handle cgo.Handle) {
 		return
 	}
 
-	// init the batch if we haven't already
+	// init the async optimization state when the first consumer starts it
 	if asyncCount >= 1 && asyncCtxBatch == nil {
+		// init the shared batch
 		initAsyncCtxBatch()
+
+		// compute the max number of workers and set all of them as unused
+		maxWorkers = getMaxWorkers(runtime.GOMAXPROCS(0))
+		activeWorkers = make([]bool, maxWorkers)
+		for i := int32(0); i < maxWorkers; i++ {
+			activeWorkers[i] = false
+		}
 	}
 
 	// assign a batch slot to this handle
