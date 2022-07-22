@@ -97,8 +97,12 @@ var (
 	// to be enabled
 	asyncEnabled bool = true
 	//
-	// asyncMutex ensures that StartAsync and StopAsync are used with mutual
-	// exclusion
+	// asyncAvailable if the underlying hardware configuration supports the
+	// async optimization
+	asyncAvailable bool = false
+	//
+	// asyncMutex ensures that Async/SetAsync/StartAsync/StopAsync are invoked
+	// with mutual exclusion
 	asyncMutex sync.Mutex
 	//
 	// asyncCount is incremented at every call to StartAsync and
@@ -133,27 +137,17 @@ const maxWorkers = int32(3)
 // be actually used at runtime, as the SDK will first check whether the hardware
 // configuration matches some minimum requirements.
 func SetAsync(enable bool) {
-	// TODO: is it ok to call this at every plugin_init()?
+	asyncMutex.Lock()
+	defer asyncMutex.Unlock()
 	asyncEnabled = enable
 }
 
 // Async returns true if the async extraction optimization is
-// configured to be enabled, and false otherwise.
+// configured to be enabled, and false otherwise. This is true by default.
 func Async() bool {
+	asyncMutex.Lock()
+	defer asyncMutex.Unlock()
 	return asyncEnabled
-}
-
-// since on high workloads an async worker can potentially occupy a whole
-// thread (and its CPU), we consider the optimization available only if
-// we run on at least 2 CPUs.
-func asyncAvailable() bool {
-	// note: runtime.GOMAXPROCS(0) should be more accurate than runtime.NumCPU()
-	// and and better aligns with the developer/user thread pool configuration.
-	//
-	// TODO: how do we prevent the plugin from breaking if
-	// runtime.GOMAXPROCS(0) is changed after starting the async workers?
-	// IDEA: make this a var boolean and set this while initializing the batch
-	return runtime.GOMAXPROCS(0) > 1
 }
 
 func initAsyncCtxBatch() {
@@ -284,16 +278,38 @@ func stopWorker(workerIdx int32) {
 //
 // The behavior of StartAsync is influenced by the value set through SetAsync:
 // if set to true the SDK will attempt to run the optimization depending on
-// the underlying hardware capacity, otherwise this will have no effect.
+// the underlying runtime capacity, otherwise this will have no effect.
 // After calling StartAsync with SetAsync set to true, the framework will try to
 // automatically shift the extraction strategy from the regular C -> Go call
 // one to the alternative worker synchronization one.
+//
+// Note, StartAsync first checks the value of runtime.GOMAXPROCS(0) to detect
+// if the underlying Go runtime is capable of supporting the async optimization.
+// After the first call to StartAsync, changing the value of runtime.GOMAXPROCS
+// has no effect on the async workers until undone with the respecting
+// StopAsync call. As such, descreasing runtime.GOMAXPROCS is generally unsafe
+// StartAsync and StopAsync calls because the optimization can eccessively
+// occupy the downsized Go runtime and eventually block it.
 func StartAsync(handle cgo.Handle) {
 	asyncMutex.Lock()
 	defer asyncMutex.Unlock()
 
 	asyncCount += 1
-	if !asyncAvailable() || !asyncEnabled {
+
+	// at the first StartAsync call, we check if the optimization is supported
+	if asyncCount == 1 {
+		// since on high workloads an async worker can potentially occupy a whole
+		// thread (and its CPU), we consider the optimization available only if
+		// we run on at least 2 CPUs.
+		//
+		// note: runtime.GOMAXPROCS(0) should be more accurate than
+		// runtime.NumCPU() and and better aligns with the developer/user
+		// thread pool configuration.
+		asyncAvailable = runtime.GOMAXPROCS(0) > 1
+	}
+
+	// do nothing if the optimization can't be started
+	if !asyncAvailable || !asyncEnabled {
 		return
 	}
 
