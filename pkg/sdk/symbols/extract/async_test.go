@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2021 The Falco Authors.
+Copyright (C) 2022 The Falco Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,25 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#pragma once
+package extract
 
-#include <stdatomic.h>
-#include "../../plugin_info.h"
+import "testing"
 
-typedef struct async_extractor_info
-{
-	// lock
-	atomic_int_least32_t lock;
-
-	// input data
-	ss_plugin_t *s;
-	const ss_plugin_event *evt;
-	uint32_t num_fields;
-	ss_plugin_extract_field *fields;
-
-	// output data
-	int32_t rc;
-} async_extractor_info;
-
-async_extractor_info *async_init(size_t size);
-void async_deinit();
+func TestGetMaxWorkers(t *testing.T) {
+	expected := []int32{0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5}
+	for i, ex := range expected {
+		v := getMaxWorkers(i + 1)
+		if v != ex {
+			t.Fatalf("getMaxWorkers returned %d but expected %d", v, ex)
+		}
+	}
+}
