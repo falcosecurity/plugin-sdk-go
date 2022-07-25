@@ -254,6 +254,9 @@ func stopWorker(workerIdx int32) {
 			// spin
 		}
 
+		// restore slot lock to unused state
+		atomic.StoreInt32((*int32)(&asyncCtxBatch[idx].lock), state_unused)
+
 		activeWorkers[workerIdx] = false
 		return
 	}
