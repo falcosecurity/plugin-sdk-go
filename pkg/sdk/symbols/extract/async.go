@@ -88,47 +88,279 @@ const (
 	// after busy-looping for starvationThresholdNs time
 	sleepTimeNs = 1e7 * time.Nanosecond
 	//
-	// asyncCtxBatchCap is the physical size of asyncCtxBatch as allocated
+	// asyncBatchSize is the physical size of batches allocated
 	// in C memory, namely the total number of locks available
-	asyncCtxBatchCap = cgo.MaxHandle + 1
+	asyncBatchSize = cgo.MaxHandle + 1
 )
 
 var (
-	// asyncEnabled is true if the async optimization is configured
+	// ctx is the asyncContext instance used by the SDK
+	ctx asyncContext
+)
+
+// asyncContext bundles all the state information used by the async
+// extraction optimization
+type asyncContext struct {
+	// disabled is false if the async optimization is configured
 	// to be enabled
-	asyncEnabled bool = true
+	disabled bool
 	//
-	// asyncAvailable if the underlying hardware configuration supports the
+	// available if the underlying hardware configuration supports the
 	// async optimization
-	asyncAvailable bool = false
+	available bool
 	//
-	// asyncMutex ensures that Async/SetAsync/StartAsync/StopAsync are invoked
+	// m ensures that Async/SetAsync/StartAsync/StopAsync are invoked
 	// with mutual exclusion
-	asyncMutex sync.Mutex
+	m sync.Mutex
 	//
-	// asyncCount is incremented at every call to StartAsync and
+	// count is incremented at every call to StartAsync and
 	// is decremented at every call to StopAsync
-	asyncCount int32 = 0
+	count int32
 	//
-	// asyncCtxBatch is a batch of async info contexts that is shared between
-	// C and Go. Each slot of the batch contains a distinct lock and is assigned
+	// batch is a batch of info that is shared between C and Go.
+	// Each slot of the batch contains a distinct lock and is assigned
 	// to only one cgo.Handle value.
-	//
-	asyncCtxBatch []C.async_extractor_info
+	batch []C.async_extractor_info
 	//
 	// maxWorkers is the max number of workers that can be active at the same time
-	maxWorkers = int32(1)
+	maxWorkers int32
 	//
 	// activeWorkers entries are true if an async worker is currently active
 	// at the given index. The size of activeWorkers is maxWorkers.
-	activeWorkers = []bool{}
+	activeWorkers []bool
 	//
 	// maxBatchIdx is the greatest slot index occupied in the batch.
 	// This value is >= 0 and < asyncCtxBatchCap. This is used by async workers
 	// to avoid looping over batch slots that are known to be unused in order to
 	// minimize the synchronization overhead.
-	maxBatchIdx = int32(0)
-)
+	maxBatchIdx int32
+}
+
+func (a *asyncContext) SetAsync(enable bool) {
+	a.m.Lock()
+	defer a.m.Unlock()
+	a.disabled = !enable
+}
+
+func (a *asyncContext) Async() bool {
+	a.m.Lock()
+	defer a.m.Unlock()
+	return !a.disabled
+}
+
+// 1 batch slot maps to only 1 worker
+func (a *asyncContext) batchIdxToWorkerIdx(slotIdx int32) int32 {
+	return slotIdx % a.maxWorkers
+}
+
+// 1 worker maps to 1+ batch slots
+func (a *asyncContext) workerIdxToBatchIdxs(workerIdx int32) (res []int32) {
+	for i := int32(workerIdx); i < int32(asyncBatchSize); i += a.maxWorkers {
+		res = append(res, i)
+	}
+	return
+}
+
+func (a *asyncContext) handleToBatchIdx(h cgo.Handle) int32 {
+	return int32(h) - 1
+}
+
+func (a *asyncContext) getMaxWorkers(maxProcs int) int32 {
+	return int32(math.Ceil(math.Log2(float64(maxProcs))))
+}
+
+func (a *asyncContext) acquireWorker(workerIdx int32) {
+	if a.activeWorkers[workerIdx] {
+		// worker is already running
+		return
+	}
+
+	// start the worker
+	a.activeWorkers[workerIdx] = true
+	go func() {
+		waitStartTime := time.Now().UnixNano()
+		batchIdxs := a.workerIdxToBatchIdxs(workerIdx)
+		for {
+			// loop over async context batch slots in round-robin
+			for _, i := range batchIdxs {
+				// reduce sync overhead by skipping unused batch slots
+				if i > a.maxBatchIdx {
+					continue
+				}
+
+				// check for incoming request, if any, otherwise busy waits
+				switch atomic.LoadInt32((*int32)(&a.batch[i].lock)) {
+
+				case state_data_req:
+					// incoming data request, process it...
+					a.batch[i].rc = C.int32_t(
+						plugin_extract_fields_sync(
+							C.uintptr_t(uintptr(a.batch[i].s)),
+							a.batch[i].evt,
+							uint32(a.batch[i].num_fields),
+							a.batch[i].fields,
+						),
+					)
+					// processing done, return back to waiting state
+					atomic.StoreInt32((*int32)(&a.batch[i].lock), state_wait)
+					// reset waiting start time
+					waitStartTime = 0
+
+				case state_exit_req:
+					// Incoming exit request. Send ack and exit.
+					atomic.StoreInt32((*int32)(&a.batch[i].lock), state_exit_ack)
+					return
+				}
+
+				// busy wait, then sleep after 1ms
+				if waitStartTime == 0 {
+					waitStartTime = time.Now().UnixNano()
+				} else if time.Now().UnixNano()-waitStartTime > starvationThresholdNs {
+					time.Sleep(sleepTimeNs)
+				}
+			}
+		}
+	}()
+}
+
+func (a *asyncContext) releaseWorker(workerIdx int32) {
+	if !a.activeWorkers[workerIdx] {
+		// work is not running, no need to stop it
+		return
+	}
+
+	// check all the batch slots assigned to the worker,
+	// and stop it only if all of them are unused
+	for _, i := range a.workerIdxToBatchIdxs(workerIdx) {
+		if atomic.LoadInt32((*int32)(&a.batch[i].lock)) != state_unused {
+			// worker is still needed, we should not stop it
+			return
+		}
+	}
+
+	// at this point, all slots assigned to the worker are
+	// unused and the worker is looping over unused locks. Right from the Go
+	// side, we use the first visible slot and set an exit request. The worker
+	// will eventually synchronize with the used lock and stop.
+	idx := a.workerIdxToBatchIdxs(workerIdx)[0]
+	for !atomic.CompareAndSwapInt32((*int32)(&a.batch[idx].lock), state_unused, state_exit_req) {
+		// spin
+	}
+
+	// wait for worker exiting
+	for atomic.LoadInt32((*int32)(&a.batch[idx].lock)) != state_exit_ack {
+		// spin
+	}
+
+	// restore first worker slot
+	atomic.StoreInt32((*int32)(&a.batch[idx].lock), state_unused)
+	a.activeWorkers[workerIdx] = false
+}
+
+func (a *asyncContext) StartAsync(handle cgo.Handle, allocBatch func() []C.async_extractor_info) {
+	a.m.Lock()
+	defer a.m.Unlock()
+
+	a.count += 1
+
+	// at the first StartAsync call, we check if the optimization is supported
+	if a.count == 1 {
+		// since on high workloads an async worker can potentially occupy a whole
+		// thread (and its CPU), we consider the optimization available only if
+		// we run on at least 2 CPUs.
+		//
+		// note: runtime.GOMAXPROCS(0) should be more accurate than
+		// runtime.NumCPU() and and better aligns with the developer/user
+		// thread pool configuration.
+		a.available = runtime.GOMAXPROCS(0) > 1
+	}
+
+	// do nothing if the optimization can't be started
+	if !a.available || a.disabled {
+		return
+	}
+
+	// init the context when the first consumer starts the async optimization
+	if a.count >= 1 && a.batch == nil {
+		// init a new batch
+		a.batch = allocBatch()
+		for i := 0; i < asyncBatchSize; i++ {
+			atomic.StoreInt32((*int32)(&a.batch[i].lock), state_unused)
+		}
+
+		// no batch index is used at the beginning
+		atomic.StoreInt32(&a.maxBatchIdx, 0)
+
+		// compute the max number of workers and set all of them as unused
+		a.maxWorkers = a.getMaxWorkers(runtime.GOMAXPROCS(0))
+		a.activeWorkers = make([]bool, a.maxWorkers)
+	}
+
+	// assign a batch slot to this handle and acquire a worker.
+	// Each handle has a 1-1 mapping with a batch slot
+	batchIdx := a.handleToBatchIdx(handle)
+	atomic.StoreInt32((*int32)(&a.batch[batchIdx].lock), state_wait)
+	if batchIdx > atomic.LoadInt32(&a.maxBatchIdx) {
+		atomic.StoreInt32(&a.maxBatchIdx, batchIdx)
+	}
+	a.acquireWorker(a.batchIdxToWorkerIdx(batchIdx))
+}
+
+func (a *asyncContext) StopAsync(handle cgo.Handle, freeBatch func([]C.async_extractor_info)) {
+	a.m.Lock()
+	defer a.m.Unlock()
+
+	a.count -= 1
+	if a.count < 0 {
+		panic("plugin-sdk-go/sdk/symbols/extract: async worker stopped without being started")
+	}
+
+	if a.batch != nil {
+		// update the state vars if this handle used async extraction
+		batchIdx := a.handleToBatchIdx(handle)
+		if atomic.LoadInt32((*int32)(&a.batch[batchIdx].lock)) != state_unused {
+			// set the assigned batch slot as unused and release worker
+			atomic.StoreInt32((*int32)(&a.batch[batchIdx].lock), state_unused)
+			a.releaseWorker(a.batchIdxToWorkerIdx(batchIdx))
+
+			// update the current maximum used slot, so that async workers
+			// will not try to sync over this index
+			if batchIdx == atomic.LoadInt32(&a.maxBatchIdx) {
+				for i := int32(batchIdx) - 1; i >= 0; i-- {
+					if atomic.LoadInt32((*int32)(&a.batch[i].lock)) != state_unused {
+						atomic.StoreInt32(&a.maxBatchIdx, i)
+						break
+					}
+				}
+			}
+		}
+
+		// if this was the last handle to be destroyed,
+		// then we can safely destroy the batch too
+		if a.count == 0 {
+			// all workers should already be stopped by now
+			for i := int32(0); i < a.maxWorkers; i++ {
+				if a.activeWorkers[i] {
+					panic(fmt.Sprintf("plugin-sdk-go/sdk/symbols/extract: worker %d can't be stopped", i))
+				}
+			}
+			freeBatch(a.batch)
+			a.batch = nil
+		}
+	}
+}
+
+func allocBatchInCMemory() (res []C.async_extractor_info) {
+	cBuf := unsafe.Pointer(C.async_init((C.size_t)(asyncBatchSize)))
+	(*reflect.SliceHeader)(unsafe.Pointer(&res)).Data = uintptr(cBuf)
+	(*reflect.SliceHeader)(unsafe.Pointer(&res)).Len = int(asyncBatchSize)
+	(*reflect.SliceHeader)(unsafe.Pointer(&res)).Cap = int(asyncBatchSize)
+	return
+}
+
+func freeBatchInCMemory(c []C.async_extractor_info) {
+	C.async_deinit()
+}
 
 // SetAsync enables or disables the async extraction optimization depending
 // on the passed-in boolean.
@@ -137,129 +369,13 @@ var (
 // be actually used at runtime, as the SDK will first check whether the hardware
 // configuration matches some minimum requirements.
 func SetAsync(enable bool) {
-	asyncMutex.Lock()
-	defer asyncMutex.Unlock()
-	asyncEnabled = enable
+	ctx.SetAsync(enable)
 }
 
 // Async returns true if the async extraction optimization is
 // configured to be enabled, and false otherwise. This is true by default.
 func Async() bool {
-	asyncMutex.Lock()
-	defer asyncMutex.Unlock()
-	return asyncEnabled
-}
-
-func initAsyncCtxBatch() {
-	// initialize the batch in C memory and convert the batch into a Go slice
-	batch := unsafe.Pointer(C.async_init((C.size_t)(asyncCtxBatchCap)))
-	(*reflect.SliceHeader)(unsafe.Pointer(&asyncCtxBatch)).Data = uintptr(batch)
-	(*reflect.SliceHeader)(unsafe.Pointer(&asyncCtxBatch)).Len = int(asyncCtxBatchCap)
-	(*reflect.SliceHeader)(unsafe.Pointer(&asyncCtxBatch)).Cap = int(asyncCtxBatchCap)
-
-	// initialize all the locks in the batch as unused for now
-	for i := 0; i < asyncCtxBatchCap; i++ {
-		atomic.StoreInt32((*int32)(&asyncCtxBatch[i].lock), state_unused)
-	}
-
-	// no batch index is used at the beginning
-	atomic.StoreInt32(&maxBatchIdx, 0)
-}
-
-func destroyAsyncCtxBatch() {
-	asyncCtxBatch = nil
-	C.async_deinit()
-}
-
-// 1 batch slot maps to only 1 worker
-func batchIdxToWorkerIdx(slotIdx int32) int32 {
-	return slotIdx % maxWorkers
-}
-
-// 1 worker maps to 1+ batch slots
-func workerIdxToBatchIdxs(workerIdx int32) []int32 {
-	var res []int32
-	for i := int32(workerIdx); i < int32(asyncCtxBatchCap); i += maxWorkers {
-		res = append(res, i)
-	}
-	return res
-}
-
-func handleToBatchIdx(h cgo.Handle) int32 {
-	return int32(h) - 1
-}
-
-func getMaxWorkers(maxProcs int) int32 {
-	return int32(math.Ceil(math.Log2(float64(maxProcs))))
-}
-
-func startWorker(workerIdx int32) {
-	waitStartTime := time.Now().UnixNano()
-	batchIdxs := workerIdxToBatchIdxs(workerIdx)
-	for {
-		// loop over async context batch slots in round-robin
-		for _, i := range batchIdxs {
-			// reduce sync overhead by skipping unused batch slots
-			if i > maxBatchIdx {
-				continue
-			}
-
-			// check for incoming request, if any, otherwise busy waits
-			switch atomic.LoadInt32((*int32)(&asyncCtxBatch[i].lock)) {
-
-			case state_data_req:
-				// incoming data request, process it...
-				asyncCtxBatch[i].rc = C.int32_t(
-					plugin_extract_fields_sync(
-						C.uintptr_t(uintptr(asyncCtxBatch[i].s)),
-						asyncCtxBatch[i].evt,
-						uint32(asyncCtxBatch[i].num_fields),
-						asyncCtxBatch[i].fields,
-					),
-				)
-				// processing done, return back to waiting state
-				atomic.StoreInt32((*int32)(&asyncCtxBatch[i].lock), state_wait)
-				// reset waiting start time
-				waitStartTime = 0
-
-			case state_exit_req:
-				// Incoming exit request. Send ack and exit.
-				atomic.StoreInt32((*int32)(&asyncCtxBatch[i].lock), state_exit_ack)
-				return
-			}
-
-			// busy wait, then sleep after 1ms
-			if waitStartTime == 0 {
-				waitStartTime = time.Now().UnixNano()
-			} else if time.Now().UnixNano()-waitStartTime > starvationThresholdNs {
-				time.Sleep(sleepTimeNs)
-			}
-		}
-	}
-}
-
-// note: this has to be called only if all the batch slots visible to a worker
-// are currently unused. So, we make a stop request from the Go side on the
-// first used slot visible by the given worker. The worker will stop after
-// resolving the first exit request.
-func stopWorker(workerIdx int32) {
-	if activeWorkers[workerIdx] {
-		idx := workerIdxToBatchIdxs(workerIdx)[0]
-		for !atomic.CompareAndSwapInt32((*int32)(&asyncCtxBatch[idx].lock), state_unused, state_exit_req) {
-			// spin
-		}
-
-		// state_exit_req acquired, wait for worker exiting
-		for atomic.LoadInt32((*int32)(&asyncCtxBatch[idx].lock)) != state_exit_ack {
-			// spin
-		}
-
-		// restore slot lock to unused state
-		atomic.StoreInt32((*int32)(&asyncCtxBatch[idx].lock), state_unused)
-
-		activeWorkers[workerIdx] = false
-		return
-	}
+	return ctx.Async()
 }
 
 // StartAsync initializes and starts the asynchronous extraction mode for the
@@ -293,112 +409,12 @@ func stopWorker(workerIdx int32) {
 // StartAsync and StopAsync calls because the optimization can eccessively
 // occupy the downsized Go runtime and eventually block it.
 func StartAsync(handle cgo.Handle) {
-	asyncMutex.Lock()
-	defer asyncMutex.Unlock()
-
-	asyncCount += 1
-
-	// at the first StartAsync call, we check if the optimization is supported
-	if asyncCount == 1 {
-		// since on high workloads an async worker can potentially occupy a whole
-		// thread (and its CPU), we consider the optimization available only if
-		// we run on at least 2 CPUs.
-		//
-		// note: runtime.GOMAXPROCS(0) should be more accurate than
-		// runtime.NumCPU() and and better aligns with the developer/user
-		// thread pool configuration.
-		asyncAvailable = runtime.GOMAXPROCS(0) > 1
-	}
-
-	// do nothing if the optimization can't be started
-	if !asyncAvailable || !asyncEnabled {
-		return
-	}
-
-	// init the async optimization state when the first consumer starts it
-	if asyncCount >= 1 && asyncCtxBatch == nil {
-		// init the shared batch
-		initAsyncCtxBatch()
-
-		// compute the max number of workers and set all of them as unused
-		maxWorkers = getMaxWorkers(runtime.GOMAXPROCS(0))
-		activeWorkers = make([]bool, maxWorkers)
-		for i := int32(0); i < maxWorkers; i++ {
-			activeWorkers[i] = false
-		}
-	}
-
-	// assign a batch slot to this handle
-	// each handle has a 1-1 mapping with a batch slot
-	batchIdx := handleToBatchIdx(handle)
-	atomic.StoreInt32((*int32)(&asyncCtxBatch[batchIdx].lock), state_wait)
-	if batchIdx > atomic.LoadInt32(&maxBatchIdx) {
-		atomic.StoreInt32(&maxBatchIdx, batchIdx)
-	}
-
-	// spawn a worker for this handle, if not already active
-	workerIdx := batchIdxToWorkerIdx(batchIdx)
-	if !activeWorkers[workerIdx] {
-		go startWorker(workerIdx)
-		activeWorkers[workerIdx] = true
-	}
+	ctx.StartAsync(handle, allocBatchInCMemory)
 }
 
 // StopAsync deinitializes the asynchronous extraction mode for the given plugin
 // handle, and undoes a single previous StartAsync call. It is a run-time error
 // if StartAsync was not called before calling StopAsync.
 func StopAsync(handle cgo.Handle) {
-	asyncMutex.Lock()
-	defer asyncMutex.Unlock()
-
-	asyncCount -= 1
-	if asyncCount < 0 {
-		panic("plugin-sdk-go/sdk/symbols/extract: async worker stopped without being started")
-	}
-
-	if asyncCtxBatch != nil {
-		// update the state vars if this handle used async extraction
-		batchIdx := handleToBatchIdx(handle)
-		if atomic.LoadInt32((*int32)(&asyncCtxBatch[batchIdx].lock)) != state_unused {
-			// set the assigned batch slot as unused
-			atomic.StoreInt32((*int32)(&asyncCtxBatch[batchIdx].lock), state_unused)
-
-			// check all the batch slots assigned to the worker,
-			// and stop it if all of them are unused
-			workerNeeded := false
-			workerIdx := batchIdxToWorkerIdx(batchIdx)
-			for _, i := range workerIdxToBatchIdxs(workerIdx) {
-				if atomic.LoadInt32((*int32)(&asyncCtxBatch[i].lock)) != state_unused {
-					workerNeeded = true
-					break
-				}
-			}
-			if !workerNeeded {
-				stopWorker(workerIdx)
-			}
-
-			// update the current maximum used slot, so that async workers
-			// will not try to sync over this index
-			if batchIdx == atomic.LoadInt32(&maxBatchIdx) {
-				for i := int32(batchIdx) - 1; i >= 0; i-- {
-					if atomic.LoadInt32((*int32)(&asyncCtxBatch[i].lock)) != state_unused {
-						atomic.StoreInt32(&maxBatchIdx, i)
-						break
-					}
-				}
-			}
-		}
-
-		// if this was the last handle to be destroyed,
-		// then we can safely destroy the batch too
-		if asyncCount == 0 {
-			// all workers should already be stopped by now
-			for i := int32(0); i < maxWorkers; i++ {
-				if activeWorkers[i] {
-					panic(fmt.Sprintf("plugin-sdk-go/sdk/symbols/extract: worker %d can't be stopped", i))
-				}
-			}
-			destroyAsyncCtxBatch()
-		}
-	}
+	ctx.StopAsync(handle, freeBatchInCMemory)
 }
