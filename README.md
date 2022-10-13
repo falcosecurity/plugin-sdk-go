@@ -14,7 +14,7 @@ This SDK facilitates writing [plugins](https://falco.org/docs/plugins) for [Falc
 
 ## Quick start
 
-Before using this SDK, review the [developer's guide](https://falco.org/docs/plugins/developers_guide/) which fully documents the API and provides best practices for writing plugins. The developer's guide includes a [walkthrough](https://falco.org/docs/plugins/developers_guide/#example-go-plugin-dummy) of a plugin written in Go that uses this package.
+Before using this SDK, review the [developer's guide](https://falco.org/docs/plugins/developers_guide/) which fully documents the API and provides best practices for writing plugins. The developer's guide includes a [walkthrough](https://falco.org/docs/plugins/go-sdk-walkthrough/#example-go-plugin-dummy) of a plugin written in Go that uses this package.
 
 For a quick start, you can refer to the provided examples:
  - [plugin with field extraction](https://github.com/falcosecurity/plugin-sdk-go/tree/main/examples/extractor) 
