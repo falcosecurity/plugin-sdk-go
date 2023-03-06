@@ -43,7 +43,7 @@ package cgo
 type Handle uintptr
 
 // MaxHandle is the largest value that an Handle can hold
-const MaxHandle = 32 - 1
+const MaxHandle = 256 - 1
 
 var (
 	handles  [MaxHandle + 1]interface{} // [int]interface{}
