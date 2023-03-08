@@ -27,6 +27,8 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 )
 
+const testAsyncMaxPlugins = 32 // note: must be <= cgo.MaxHandle
+
 type sampleAsyncExtract struct {
 	sampleExtract
 	counter uint64
@@ -156,7 +158,7 @@ func TestAsyncExtract(t *testing.T) {
 	}
 
 	// run with increasing number of concurrent consumers
-	for i := 1; i <= cgo.MaxHandle; i *= 2 {
+	for i := 1; i <= testAsyncMaxPlugins; i *= 2 {
 		// run with increasing number of extractions
 		for j := 1; j < 10000; j *= 10 {
 			workload(i, j)
@@ -165,64 +167,77 @@ func TestAsyncExtract(t *testing.T) {
 }
 
 func TestStartStopAsync(t *testing.T) {
-	nPlugins := cgo.MaxHandle
-	testWithMockPlugins(nPlugins, func(handles []cgo.Handle) {
-		// test unbalanced start/stop calls
-		assertPanic(t, func() {
-			a := asyncContext{}
-			a.StopAsync(handles[0], testReleaseAsyncBatch)
-		})
-		assertPanic(t, func() {
-			a := asyncContext{}
-			a.StartAsync(handles[0], testAllocAsyncBatch)
-			a.StopAsync(handles[0], testReleaseAsyncBatch)
-			a.StopAsync(handles[0], testReleaseAsyncBatch)
+	nPlugins := testAsyncMaxPlugins
+	// checking that an odd or event number of plugins is not relevant
+	for i := nPlugins - 1; i <= nPlugins+1; i++ {
+		t.Run(fmt.Sprintf("unbalanced-startstop#%d", i), func(t *testing.T) {
+			testWithMockPlugins(nPlugins, func(handles []cgo.Handle) {
+				// test unbalanced start/stop calls
+				assertPanic(t, func() {
+					a := asyncContext{}
+					a.StopAsync(handles[0], testReleaseAsyncBatch)
+				})
+				assertPanic(t, func() {
+					a := asyncContext{}
+					a.StartAsync(handles[0], testAllocAsyncBatch)
+					a.StopAsync(handles[0], testReleaseAsyncBatch)
+					a.StopAsync(handles[0], testReleaseAsyncBatch)
+				})
+
+				// test with bad start/stop-handle pair
+				assertPanic(t, func() {
+					a := asyncContext{}
+					a.StartAsync(handles[0], testAllocAsyncBatch)
+					a.StartAsync(handles[1], testAllocAsyncBatch)
+					a.StopAsync(handles[0], testReleaseAsyncBatch)
+					a.StopAsync(handles[0], testReleaseAsyncBatch)
+				})
+			})
 		})
 
-		// test with bad start/stop-handle pair
-		assertPanic(t, func() {
-			a := asyncContext{}
-			a.StartAsync(handles[0], testAllocAsyncBatch)
-			a.StartAsync(handles[1], testAllocAsyncBatch)
-			a.StopAsync(handles[0], testReleaseAsyncBatch)
-			a.StopAsync(handles[0], testReleaseAsyncBatch)
-		})
-
-		// test with inconsistent enabled values
-		a := asyncContext{}
-		enabled := true
-		for i := 0; i < nPlugins; i++ {
-			a.SetAsync(enabled)
-			a.StartAsync(handles[i], testAllocAsyncBatch)
-			enabled = !enabled
-		}
-		for i := 0; i < nPlugins; i++ {
-			a.StopAsync(handles[i], testReleaseAsyncBatch)
-		}
-
-		// test workload after already having started/stopped the same context
-		var wg sync.WaitGroup
-		for _, h := range handles {
-			wg.Add(1)
-			a.StartAsync(h, testAllocAsyncBatch)
-			go func(h cgo.Handle) {
-				counter := uint64(0)
-				field, freeField := allocSSPluginExtractField(1, sdk.FieldTypeUint64, "", "")
-				defer freeField()
-				for e := 0; e < 1000; e++ {
-					testSimulateAsyncRequest(t, &a, h, field)
-					value := **((**uint64)(unsafe.Pointer(&field.res[0])))
-					if value != counter {
-						panic(fmt.Sprintf("extracted %d but expected %d", value, counter))
-					}
-					counter++
+		t.Run(fmt.Sprintf("inconsistent-async#%d", i), func(t *testing.T) {
+			testWithMockPlugins(nPlugins, func(handles []cgo.Handle) {
+				// test with inconsistent enabled values
+				a := asyncContext{}
+				enabled := false
+				for i := 0; i < nPlugins; i++ {
+					a.SetAsync(enabled)
+					a.StartAsync(handles[i], testAllocAsyncBatch)
+					enabled = !enabled
 				}
-				wg.Done()
-			}(h)
-		}
-		wg.Wait()
-		for _, h := range handles {
-			a.StopAsync(h, testReleaseAsyncBatch)
-		}
-	})
+				for i := 0; i < nPlugins; i++ {
+					a.StopAsync(handles[i], testReleaseAsyncBatch)
+				}
+
+				// test workload after already having started/stopped the same context
+				var wg sync.WaitGroup
+				for _, h := range handles {
+					wg.Add(1)
+					a.SetAsync(enabled)
+					a.StartAsync(h, testAllocAsyncBatch)
+					go func(h cgo.Handle, enabled bool) {
+						counter := uint64(0)
+						field, freeField := allocSSPluginExtractField(1, sdk.FieldTypeUint64, "", "")
+						defer freeField()
+						for e := 0; e < 1000; e++ {
+							if enabled {
+								testSimulateAsyncRequest(t, &a, h, field)
+								value := **((**uint64)(unsafe.Pointer(&field.res[0])))
+								if value != counter {
+									panic(fmt.Sprintf("extracted %d but expected %d", value, counter))
+								}
+							}
+							counter++
+						}
+						wg.Done()
+					}(h, enabled)
+					enabled = !enabled
+				}
+				wg.Wait()
+				for _, h := range handles {
+					a.StopAsync(h, testReleaseAsyncBatch)
+				}
+			})
+		})
+	}
 }
