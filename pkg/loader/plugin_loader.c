@@ -93,6 +93,7 @@ plugin_handle_t* plugin_load(const char* path, char* err)
     SYM_RESOLVE(ret, get_description);
     SYM_RESOLVE(ret, get_contact);
     SYM_RESOLVE(ret, get_init_schema);
+    SYM_RESOLVE(ret, get_metrics);
     SYM_RESOLVE(ret, init);
     SYM_RESOLVE(ret, destroy);
     SYM_RESOLVE(ret, get_id);

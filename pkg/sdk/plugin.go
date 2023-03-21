@@ -83,3 +83,9 @@ type OpenParams interface {
 type InitSchema interface {
 	InitSchema() *SchemaInfo
 }
+
+// TODO(jasondellaluce): add docs for this
+type Metrics interface {
+	MetricFactory() MetricFactory
+	SetMetricFactory(MetricFactory)
+}

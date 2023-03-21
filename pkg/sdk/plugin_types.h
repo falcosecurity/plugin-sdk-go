@@ -56,6 +56,37 @@ typedef enum ss_plugin_schema_type
 	SS_PLUGIN_SCHEMA_JSON = 1,
 } ss_plugin_schema_type;
 
+// TODO(jasondellaluce): add docs for this
+typedef enum ss_plugin_metric_type {
+    SS_PLUGIN_METRIC_COUNTER = 1,
+    SS_PLUGIN_METRIC_GAUGE = 2,
+} ss_plugin_metric_type;
+
+// TODO(jasondellaluce): add docs for this
+typedef struct ss_plugin_metric_label
+{
+    const char* name;
+    const char* value;
+} ss_plugin_metric_label;
+
+// TODO(jasondellaluce): add docs for this
+typedef struct ss_plugin_metric_entry
+{
+    uint32_t labels_len;
+    ss_plugin_metric_label* labels;
+    // todo(jasondellaluce): make this a union if we ever support different value types
+    double value;
+} ss_plugin_metric_entry;
+
+// TODO(jasondellaluce): add docs for this
+typedef struct ss_plugin_metric
+{
+    uint32_t entries_len;
+    ss_plugin_metric_entry* entries;
+	const char* name;
+    ss_plugin_metric_type type;
+} ss_plugin_metric;
+
 // This struct represents an event returned by the plugin, and is used
 // below in next_batch().
 // - evtnum: incremented for each event returned. Might not be contiguous.

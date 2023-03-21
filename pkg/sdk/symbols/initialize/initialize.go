@@ -93,9 +93,12 @@ func plugin_init(config *C.char, rc *int32) C.uintptr_t {
 		*rc = sdk.SSPluginFailure
 	} else {
 		// this allows a nil state
-		extrReqs, ok := state.(sdk.ExtractRequests)
-		if ok && extrReqs.ExtractRequests() == nil {
+		if extrReqs, ok := state.(sdk.ExtractRequests); ok && extrReqs.ExtractRequests() == nil {
 			extrReqs.SetExtractRequests(sdk.NewExtractRequestPool())
+		}
+
+		if metrics, ok := state.(sdk.Metrics); ok && metrics.MetricFactory() == nil {
+			metrics.SetMetricFactory(sdk.NewMetricsFactory())
 		}
 		*rc = sdk.SSPluginSuccess
 	}

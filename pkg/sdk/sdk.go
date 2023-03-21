@@ -39,6 +39,12 @@ const (
 	SSPluginNotSupported int32 = 3
 )
 
+// TODO(jasondellaluce): document this
+const (
+	SSPluginMetricCounter uint32 = 1
+	SSPluginMetricGauge   int32  = 2
+)
+
 // DefaultEvtSize is the default size for the data payload allocated
 // for each event in the EventWriters interface used by the SDK.
 const DefaultEvtSize uint32 = 256 * 1024

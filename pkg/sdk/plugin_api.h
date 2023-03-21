@@ -28,7 +28,7 @@ extern "C" {
 // API versions of this plugin framework
 //
 #define PLUGIN_API_VERSION_MAJOR 2
-#define PLUGIN_API_VERSION_MINOR 0
+#define PLUGIN_API_VERSION_MINOR 1
 #define PLUGIN_API_VERSION_PATCH 0
 
 //
@@ -137,6 +137,9 @@ typedef struct
 	// calls get_last_error() to access that string.
 	//
 	const char *(*get_last_error)(ss_plugin_t *s);
+
+	// TODO(jasondellaluce): add docs for this
+	ss_plugin_metric* (*get_metrics)(ss_plugin_t *s, uint32_t* len);
 
 	//
 	// Return the name of the plugin, which will be printed when displaying

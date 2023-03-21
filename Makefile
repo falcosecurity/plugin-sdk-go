@@ -14,8 +14,8 @@ SHELL := /bin/bash
 GO    ?= $(shell which go)
 CURL  ?= $(shell which curl)
 
-FALCOSECURITY_LIBS_REVISION ?= 000eb27573af74168510e4836330ff6958c3f355
-FALCOSECURITY_LIBS_REPO ?= falcosecurity/libs
+FALCOSECURITY_LIBS_REVISION ?= 6b88a04056233c56383beed9a3b43f1e99596d1a
+FALCOSECURITY_LIBS_REPO ?= jasondellaluce/libs
 PLUGINLIB_URL=https://raw.githubusercontent.com/${FALCOSECURITY_LIBS_REPO}/${FALCOSECURITY_LIBS_REVISION}/userspace/plugin
 
 examples_dir = $(shell ls -d examples/*/ | cut -f2 -d'/' | xargs)

@@ -22,6 +22,7 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/info"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/initialize"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/initschema"
+	_ "github.com/falcosecurity/plugin-sdk-go/pkg/sdk/symbols/metrics"
 )
 
 // Info is a struct containing the general information about a plugin.
@@ -127,6 +128,19 @@ func (b *BaseOpenParams) OpenParamsBuffer() sdk.StringBuffer {
 	return &b.openParamsBuf
 }
 
+// TODO(jasondellaluce): add docs for this
+type BaseMetricsFactory struct {
+	metricsFactory sdk.MetricFactory
+}
+
+func (b *BaseMetricsFactory) SetMetricFactory(v sdk.MetricFactory) {
+	b.metricsFactory = v
+}
+
+func (b *BaseMetricsFactory) MetricFactory() sdk.MetricFactory {
+	return b.metricsFactory
+}
+
 // BasePlugin is a base implementation of the Plugin interface.
 // Developer-defined Plugin implementations should be composed with BasePlugin
 // to have out-of-the-box compliance with all the required interfaces.
@@ -135,6 +149,7 @@ type BasePlugin struct {
 	BaseStringer
 	BaseExtractRequests
 	BaseOpenParams
+	BaseMetricsFactory
 }
 
 // FactoryFunc creates a new Plugin

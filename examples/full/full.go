@@ -68,7 +68,8 @@ type MyPlugin struct {
 // In this example, we store the internal value of the incrementing counter.
 type MyInstance struct {
 	source.BaseInstance
-	counter uint64
+	counter    uint64
+	evtCounter sdk.Counter
 }
 
 // The plugin must be registered to the SDK in the init() function.
@@ -197,7 +198,8 @@ func (m *MyPlugin) Open(params string) (source.Instance, error) {
 	}
 
 	myInstance := &MyInstance{
-		counter: m.config.Start,
+		counter:    m.config.Start,
+		evtCounter: m.MetricFactory().NewCounter("events_count"),
 	}
 	myInstance.SetEvents(myBatch)
 	return myInstance, nil
@@ -224,8 +226,12 @@ func (m *MyInstance) NextBatch(pState sdk.PluginState, evts sdk.EventWriters) (i
 	var n int
 	var evt sdk.EventWriter
 	for n = 0; n < evts.Len(); n++ {
+		if m.counter >= 50 {
+			return n, sdk.ErrEOF
+		}
 		evt = evts.Get(n)
 		m.counter++
+		m.evtCounter.Add(1)
 		encoder := gob.NewEncoder(evt.Writer())
 		if err := encoder.Encode(m.counter); err != nil {
 			return 0, err
