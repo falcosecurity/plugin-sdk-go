@@ -28,12 +28,16 @@ package sdk
 typedef union {
 	const char* str;
 	uint64_t u64;
+	uint32_t u32;
+	bool boolean;
+	const_sized_buffer* buf;
 } field_result_t;
 
 */
 import "C"
 import (
 	"unsafe"
+	"reflect"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
 )
@@ -44,6 +48,11 @@ const (
 	minResultBufferLen = 512
 )
 
+type ConstSizedBuffer = struct {
+        Buf     []byte
+        Size    uint32
+}
+
 // ExtractRequest represents an high-level abstraction that wraps a pointer to
 // a ss_plugin_extract_field C structure, providing methods for accessing its
 // fields in a go-friendly way.
@@ -53,8 +62,16 @@ type ExtractRequest interface {
 	FieldID() uint64
 	//
 	// FieldType returns the type of the field for which the value extraction
-	// is requested. For now, only sdk.FieldTypeUint64 and
-	// sdk.FieldTypeCharBuf are supported.
+	// is requested. For now, the supported types are:
+	// - sdk.FieldTypeUint64
+	// - sdk.FieldTypeCharBuf
+	// - sdk.FieldTypeIPv4Addr
+	// - sdk.FieldTypeRelTime
+	// - sdk.FieldTypeAbsTime
+	// - sdk.FieldTypeBool
+	// - sdk.FieldTypeIPv4Net
+	// - sdk.FieldTypeIPv6Addr
+	// - sdk.FieldTypeIPv6Net
 	FieldType() uint32
 	//
 	// Field returns the name of the field for which the value extraction
@@ -143,6 +160,8 @@ type extractRequest struct {
 	resBufLen uint32
 	// List of StringBuffer to return string results
 	resStrBufs []StringBuffer
+	// List of BytesReadWriter to return binary results
+	resBinBufs []ptr.BytesReadWriter
 }
 
 func (e *extractRequest) SetPtr(pef unsafe.Pointer) {
@@ -179,7 +198,7 @@ func (e *extractRequest) IsList() bool {
 
 func (e *extractRequest) SetValue(v interface{}) {
 	switch e.FieldType() {
-	case FieldTypeUint64:
+	case FieldTypeRelTime, FieldTypeAbsTime, FieldTypeUint64:
 		if e.req.flist {
 			if e.resBufLen < uint32(len(v.([]uint64))) {
 				C.free(unsafe.Pointer(e.resBuf))
@@ -194,12 +213,32 @@ func (e *extractRequest) SetValue(v interface{}) {
 			*((*C.uint64_t)(unsafe.Pointer(e.resBuf))) = (C.uint64_t)(v.(uint64))
 			e.req.res_len = (C.uint64_t)(1)
 		}
+
+	case FieldTypeIPv4Net, FieldTypeIPv6Addr, FieldTypeIPv6Net:
+		if e.req.flist {
+			//TODO
+		} else {
+			bytes := make([]byte, len(v.([]byte)))
+			bytesPtr := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&bytes)).Data)
+			b, err := ptr.NewBytesReadWriter(bytesPtr, int64(len(v.([]byte))), int64(len(v.([]byte))))
+			//XXX error handling
+			if err != nil {
+				panic(err)
+			}
+			e.resBinBufs = append(e.resBinBufs, b)
+			e.resBinBufs[0].Write(v.([]byte))
+			*((*C.uint32_t)(unsafe.Pointer(e.resBuf))) = (C.uint32_t)(len(v.([]byte)))
+			*((**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(C.sizeof_uint32_t)))) = (*C.char)(e.resBinBufs[0].BufferPtr())
+			e.resBufLen = uint32(len(v.([]byte)))
+			e.req.res_len = (C.uint64_t)(1)
+		}
+
 	case FieldTypeCharBuf:
 		if e.req.flist {
 			if e.resBufLen < uint32(len(v.([]string))) {
 				C.free(unsafe.Pointer(e.resBuf))
 				e.resBufLen = uint32(len(v.([]string)))
-				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)(e.resBufLen * C.sizeof_field_result_t)))
+				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)((e.resBufLen) * C.sizeof_field_result_t)))
 			}
 			for i, val := range v.([]string) {
 				if len(e.resStrBufs) <= i {
@@ -214,6 +253,39 @@ func (e *extractRequest) SetValue(v interface{}) {
 			*((**C.char)(unsafe.Pointer(e.resBuf))) = (*C.char)(e.resStrBufs[0].CharPtr())
 			e.req.res_len = (C.uint64_t)(1)
 		}
+
+	case FieldTypeBool:
+		if e.req.flist {
+			if e.resBufLen < uint32(len(v.([]bool))) {
+				C.free(unsafe.Pointer(e.resBuf))
+				e.resBufLen = uint32(len(v.([]bool)))
+				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)(e.resBufLen * C.sizeof_field_result_t)))
+			}
+			for i, val := range v.([]bool) {
+				*((*C.bool)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (C.bool)(val)
+			}
+			e.req.res_len = (C.uint64_t)(len(v.([]bool)))
+		} else {
+			*((*C.bool)(unsafe.Pointer(e.resBuf))) = (C.bool)(v.(bool))
+			e.req.res_len = (C.uint64_t)(1)
+		}
+
+	case FieldTypeIPv4Addr:
+		if e.req.flist {
+			if e.resBufLen < uint32(len(v.([]uint32))) {
+				C.free(unsafe.Pointer(e.resBuf))
+				e.resBufLen = uint32(len(v.([]uint32)))
+				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)(e.resBufLen * C.sizeof_field_result_t)))
+			}
+			for i, val := range v.([]uint32) {
+				*((*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (C.uint32_t)(val)
+			}
+			e.req.res_len = (C.uint64_t)(len(v.([]uint32)))
+		} else {
+			*((*C.uint32_t)(unsafe.Pointer(e.resBuf))) = (C.uint32_t)(v.(uint32))
+			e.req.res_len = (C.uint64_t)(1)
+		}
+
 	default:
 		panic("plugin-sdk-go/sdk: called SetValue with unsupported field type")
 	}

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"testing"
 	"unsafe"
+	"bytes"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
 )
@@ -49,6 +50,14 @@ func allocSSPluginExtractField(fid, ftype uint32, fname, farg_key string, farg_i
 	}
 }
 
+func getBoolResSSPluingExtractField(t *testing.T, ptr *_Ctype_ss_plugin_extract_field, index int) bool {
+	if ptr.res_len < (_Ctype_uint64_t)(index) {
+		t.Errorf("trying to access extract field res at index %d, but res len is %d", index, (int)(ptr.res_len))
+	}
+	value := (uint8)(*((*_Ctype_uint32_t)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&ptr.res))) + uintptr(index*_Ciconst_sizeof_field_result_t)))))
+	return value != uint8(0)
+}
+
 func getStrResSSPluingExtractField(t *testing.T, p *_Ctype_ss_plugin_extract_field, index int) string {
 	if p.res_len < (_Ctype_uint64_t)(index) {
 		t.Errorf("trying to access extract field res at index %d, but res len is %d", index, (int)(p.res_len))
@@ -61,6 +70,20 @@ func getU64ResSSPluingExtractField(t *testing.T, ptr *_Ctype_ss_plugin_extract_f
 		t.Errorf("trying to access extract field res at index %d, but res len is %d", index, (int)(ptr.res_len))
 	}
 	return (uint64)(*((*_Ctype_uint64_t)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&ptr.res))) + uintptr(index*_Ciconst_sizeof_field_result_t)))))
+}
+
+func getBinResSSPluingExtractField(t *testing.T, p *_Ctype_ss_plugin_extract_field, index int) []byte {
+	if p.res_len < (_Ctype_uint64_t)(index) {
+		t.Errorf("trying to access extract field res at index %d, but res len is %d", index, (int)(p.res_len))
+	}
+	size := *(*uint32)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&p.res))) + uintptr(index*_Ciconst_sizeof_field_result_t)))
+	ptrBytes := *(*uintptr)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&p.res))) + uintptr(_Ciconst_sizeof_uint32_t) + uintptr(index*_Ciconst_sizeof_field_result_t)))
+	res := make([]byte, size)
+	for i:=0 ; i < int(size); i++{
+		fmt.Printf("%d => %v\n",i,ptrBytes)
+		res[i] = *(*uint8)(unsafe.Pointer(ptrBytes+uintptr(i)))
+	}
+	return res
 }
 
 func assertPanic(t *testing.T, fun func()) {
@@ -93,11 +116,24 @@ func TestExtractRequestSetValue(t *testing.T) {
 	// init test data
 	testStr := "test str"
 	testU64 := uint64(99)
+	testBool := true
+	//testIPv6 := []byte{ 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0xff, 0xff , 0xff , 0xff , 0xff , 0xff , 0xff , 0xff , 0xff , 0xff , 0xff , 0xff }
+	testIPv6 := []byte{ 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41 }
 	testStrList := make([]string, 0)
 	testU64List := make([]uint64, 0)
+	testBoolList := make([]bool, 0)
+	/*
+	data := make([]byte, (minResultBufferLen+1)*len(testIPv6))
+	for i := 0; i < (minResultBufferLen+1)*len(testIPv6); i++ {
+		data[i] = byte(i)
+	}
+	testIPv6List := make([][]byte, minResultBufferLen+1)
+	*/
 	for i := 0; i < minResultBufferLen+1; i++ { // cause a list resizing
 		testStrList = append(testStrList, fmt.Sprintf("test-%d", i))
 		testU64List = append(testU64List, uint64(i))
+		testBoolList = append(testBoolList, i%3==0)
+		//testIPv6List[i] = data[i*len(testIPv6) : (i+1)*len(testIPv6)]
 	}
 
 	// init extract requests
@@ -106,14 +142,27 @@ func TestExtractRequestSetValue(t *testing.T) {
 	u64ListPtr, freeU64ListPtr := allocSSPluginExtractField(2, FieldTypeUint64, "test.u64", "", 0, true, true)
 	strPtr, freeStrPtr := allocSSPluginExtractField(3, FieldTypeCharBuf, "test.str", "", 0, true, false)
 	strListPtr, freeStrListPtr := allocSSPluginExtractField(4, FieldTypeCharBuf, "test.str", "", 0, true, true)
+	boolPtr, freeBoolPtr := allocSSPluginExtractField(5, FieldTypeBool, "test.bool", "", 0, true, false)
+	boolListPtr, freeBoolListPtr := allocSSPluginExtractField(6, FieldTypeBool, "test.bool", "", 0, true, true)
+	binPtr, freeBinPtr := allocSSPluginExtractField(7, FieldTypeIPv6Addr, "test.ipv6addr", "", 0, true, false)
+	//binListPtr, freeBinListPtr := allocSSPluginExtractField(8, FieldTypeIPv6Addr, "test.ipv6addr", "", 0, true, true)
+	binListPtr, _ := allocSSPluginExtractField(8, FieldTypeIPv6Addr, "test.ipv6addr", "", 0, true, true)
 	u64Req := pool.Get(0)
 	u64ReqList := pool.Get(1)
 	strReq := pool.Get(2)
 	strReqList := pool.Get(3)
+	boolReq := pool.Get(4)
+	boolReqList := pool.Get(5)
+	binReq := pool.Get(6)
+	binReqList := pool.Get(7)
 	u64Req.SetPtr(unsafe.Pointer(u64Ptr))
 	u64ReqList.SetPtr(unsafe.Pointer(u64ListPtr))
 	strReq.SetPtr(unsafe.Pointer(strPtr))
 	strReqList.SetPtr(unsafe.Pointer(strListPtr))
+	boolReq.SetPtr(unsafe.Pointer(boolPtr))
+	boolReqList.SetPtr(unsafe.Pointer(boolListPtr))
+	binReq.SetPtr(unsafe.Pointer(binPtr))
+	binReqList.SetPtr(unsafe.Pointer(binListPtr))
 
 	// check that info is passed-through correctly
 	if u64Req.FieldID() != 1 {
@@ -144,9 +193,20 @@ func TestExtractRequestSetValue(t *testing.T) {
 	// check panics
 	assertPanic(t, func() {
 		u64Req.SetValue("test")
+		u64Req.SetValue(bool(true))
 	})
 	assertPanic(t, func() {
 		strReq.SetValue(uint64(1))
+		strReq.SetValue(bool(true))
+	})
+	assertPanic(t, func() {
+		boolReq.SetValue(uint64(1))
+		boolReq.SetValue("test")
+	})
+	assertPanic(t, func() {
+		binReq.SetValue(uint64(1))
+		binReq.SetValue("test")
+		//XXX add other values
 	})
 
 	// check set correct values
@@ -170,10 +230,37 @@ func TestExtractRequestSetValue(t *testing.T) {
 			t.Errorf("expected value '%s', but found '%s'", s, getStrResSSPluingExtractField(t, strPtr, i))
 		}
 	}
+	boolReq.SetValue(testBool)
+	if getBoolResSSPluingExtractField(t, boolPtr, 0) != testBool {
+		t.Errorf("expected value '%v', but found '%v'", testBool, getBoolResSSPluingExtractField(t, boolPtr, 0))
+	}
+	boolReqList.SetValue(testBoolList)
+	for i, b := range testBoolList {
+		if getBoolResSSPluingExtractField(t, boolListPtr, i) != b {
+			t.Errorf("expected value '%v', but found '%v' at index %d", b, getBoolResSSPluingExtractField(t, boolPtr, i),i)
+		}
+	}
+	binReq.SetValue(testIPv6)
+	if !bytes.Equal(getBinResSSPluingExtractField(t, binPtr, 0), testIPv6) {
+		t.Errorf("expected value '%v', but found '%v'", testIPv6, getBinResSSPluingExtractField(t, binPtr, 0))
+	}
+	/*
+	binReqList.SetValue(testIPv6List)
+	for i, s := range testIPv6List {
+		//if getBinResSSPluingExtractField(t, binListPtr, i) != s {
+		if getBinResSSPluingExtractField(t, binListPtr, i) != nil {
+			t.Errorf("expected value '%v', but found '%v'", s, getBinResSSPluingExtractField(t, binPtr, i))
+		}
+	}
+	*/
 
 	pool.Free()
 	freeU64Ptr()
 	freeU64ListPtr()
 	freeStrPtr()
 	freeStrListPtr()
+	freeBoolPtr()
+	freeBoolListPtr()
+	freeBinPtr()
+	//freeBinListPtr()
 }
