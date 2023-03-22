@@ -76,12 +76,12 @@ func getBinResSSPluingExtractField(t *testing.T, p *_Ctype_ss_plugin_extract_fie
 	if p.res_len < (_Ctype_uint64_t)(index) {
 		t.Errorf("trying to access extract field res at index %d, but res len is %d", index, (int)(p.res_len))
 	}
-	size := *(*uint32)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&p.res))) + uintptr(index*_Ciconst_sizeof_field_result_t)))
-	ptrBytes := *(*uintptr)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&p.res))) + uintptr(_Ciconst_sizeof_uint32_t) + uintptr(index*_Ciconst_sizeof_field_result_t)))
+	size := **(**uint32)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&p.res))) + uintptr(index*_Ciconst_sizeof_field_result_t)))
+	
+	ptrBytes := *(*uintptr)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&p.res))) + uintptr(index*_Ciconst_sizeof_field_result_t)))
 	res := make([]byte, size)
 	for i:=0 ; i < int(size); i++{
-		fmt.Printf("%d => %v\n",i,ptrBytes)
-		res[i] = *(*uint8)(unsafe.Pointer(ptrBytes+uintptr(i)))
+		res[i] = *(*uint8)(unsafe.Pointer(ptrBytes+uintptr(i+4)))
 	}
 	return res
 }
@@ -122,18 +122,16 @@ func TestExtractRequestSetValue(t *testing.T) {
 	testStrList := make([]string, 0)
 	testU64List := make([]uint64, 0)
 	testBoolList := make([]bool, 0)
-	/*
 	data := make([]byte, (minResultBufferLen+1)*len(testIPv6))
 	for i := 0; i < (minResultBufferLen+1)*len(testIPv6); i++ {
 		data[i] = byte(i)
 	}
 	testIPv6List := make([][]byte, minResultBufferLen+1)
-	*/
 	for i := 0; i < minResultBufferLen+1; i++ { // cause a list resizing
 		testStrList = append(testStrList, fmt.Sprintf("test-%d", i))
 		testU64List = append(testU64List, uint64(i))
 		testBoolList = append(testBoolList, i%3==0)
-		//testIPv6List[i] = data[i*len(testIPv6) : (i+1)*len(testIPv6)]
+		testIPv6List[i] = data[i*len(testIPv6) : (i+1)*len(testIPv6)]
 	}
 
 	// init extract requests
@@ -145,8 +143,7 @@ func TestExtractRequestSetValue(t *testing.T) {
 	boolPtr, freeBoolPtr := allocSSPluginExtractField(5, FieldTypeBool, "test.bool", "", 0, true, false)
 	boolListPtr, freeBoolListPtr := allocSSPluginExtractField(6, FieldTypeBool, "test.bool", "", 0, true, true)
 	binPtr, freeBinPtr := allocSSPluginExtractField(7, FieldTypeIPv6Addr, "test.ipv6addr", "", 0, true, false)
-	//binListPtr, freeBinListPtr := allocSSPluginExtractField(8, FieldTypeIPv6Addr, "test.ipv6addr", "", 0, true, true)
-	binListPtr, _ := allocSSPluginExtractField(8, FieldTypeIPv6Addr, "test.ipv6addr", "", 0, true, true)
+	binListPtr, freeBinListPtr := allocSSPluginExtractField(8, FieldTypeIPv6Addr, "test.ipv6addr", "", 0, true, true)
 	u64Req := pool.Get(0)
 	u64ReqList := pool.Get(1)
 	strReq := pool.Get(2)
@@ -244,15 +241,12 @@ func TestExtractRequestSetValue(t *testing.T) {
 	if !bytes.Equal(getBinResSSPluingExtractField(t, binPtr, 0), testIPv6) {
 		t.Errorf("expected value '%v', but found '%v'", testIPv6, getBinResSSPluingExtractField(t, binPtr, 0))
 	}
-	/*
 	binReqList.SetValue(testIPv6List)
 	for i, s := range testIPv6List {
-		//if getBinResSSPluingExtractField(t, binListPtr, i) != s {
-		if getBinResSSPluingExtractField(t, binListPtr, i) != nil {
-			t.Errorf("expected value '%v', but found '%v'", s, getBinResSSPluingExtractField(t, binPtr, i))
+		if ! bytes.Equal(getBinResSSPluingExtractField(t, binListPtr, i),s) {
+			t.Errorf("expected value '%v' at %d, but found '%v'", s, i, getBinResSSPluingExtractField(t, binListPtr, i))
 		}
 	}
-	*/
 
 	pool.Free()
 	freeU64Ptr()
@@ -262,5 +256,5 @@ func TestExtractRequestSetValue(t *testing.T) {
 	freeBoolPtr()
 	freeBoolListPtr()
 	freeBinPtr()
-	//freeBinListPtr()
+	freeBinListPtr()
 }
