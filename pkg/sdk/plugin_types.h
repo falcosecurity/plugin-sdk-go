@@ -23,13 +23,21 @@ extern "C" {
 
 #include <stdbool.h>
 #include <inttypes.h>
+#include <stddef.h>
 
 // The noncontinguous numbers are to maintain equality with underlying
-// falcosecurity libs types.
+// falcosecurity libs types (ppm_events_public.h).
 typedef enum ss_plugin_field_type
 {
-	FTYPE_UINT64 = 8,
-	FTYPE_STRING = 9
+	FTYPE_UINT64      = 8,
+	FTYPE_STRING      = 9,
+	FTYPE_IPV4ADDR    = 12,
+	FTYPE_RELTIME     = 20,
+	FTYPE_ABSTIME     = 21,
+	FTYPE_BOOL        = 25,
+	FTYPE_IPV4NET     = 37,
+	FTYPE_IPV6ADDR    = 38,
+	FTYPE_IPV6NET     = 39,
 } ss_plugin_field_type;
 
 // Values to return from init() / open() / next_batch() /
@@ -77,6 +85,13 @@ typedef struct ss_plugin_event
 	uint32_t datalen;
 	uint64_t ts;
 } ss_plugin_event;
+
+//XXX add some comments here
+struct const_sized_buffer {
+	size_t size;
+	const void* buf;
+};
+typedef struct const_sized_buffer const_sized_buffer;
 
 // Used in extract_fields functions below to receive a field/arg
 // pair and return an extracted value.
@@ -126,6 +141,8 @@ typedef struct ss_plugin_extract_field
     {
 		const char** str;
 		uint64_t* u64;
+		uint32_t* u32;
+		const_sized_buffer* buf_ptr;
 	} res;
 	uint64_t res_len;
 

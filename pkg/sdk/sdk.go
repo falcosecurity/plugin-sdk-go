@@ -1,4 +1,5 @@
 /*
+   
 Copyright (C) 2021 The Falco Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,10 +49,17 @@ const DefaultEvtSize uint32 = 256 * 1024
 const DefaultBatchSize uint32 = 128
 
 // The full set of values that can be returned in the ftype
-// member of ss_plugin_extract_field structs.
+// member of ss_plugin_extract_field structs (ppm_events_public.h).
 const (
-	FieldTypeUint64  uint32 = 8
-	FieldTypeCharBuf uint32 = 9 // A printable buffer of bytes, NULL terminated
+	FieldTypeUint64   uint32 = 8
+	FieldTypeCharBuf  uint32 = 9 // A printable buffer of bytes, NULL terminated
+	FieldTypeIPv4Addr uint32 = 12
+	FieldTypeRelTime  uint32 = 20
+	FieldTypeAbsTime  uint32 = 21
+	FieldTypeBool     uint32 = 25
+	FieldTypeIPv4Net  uint32 = 37
+	FieldTypeIPv6Addr uint32 = 38
+	FieldTypeIPv6Net  uint32 = 39
 )
 
 // FieldEntry represents a single field entry that a plugin with field extraction
