@@ -38,6 +38,7 @@ import "C"
 import (
 	"unsafe"
 	"reflect"
+	"encoding/binary"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
 )
@@ -216,19 +217,45 @@ func (e *extractRequest) SetValue(v interface{}) {
 
 	case FieldTypeIPv4Net, FieldTypeIPv6Addr, FieldTypeIPv6Net:
 		if e.req.flist {
-			//TODO
+			if e.resBufLen < uint32(len(v.([][]byte))) {
+				C.free(unsafe.Pointer(e.resBuf))
+				e.resBufLen = uint32(len(v.([][]byte)))
+				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)((e.resBufLen) * C.sizeof_field_result_t)))
+			}
+			for i, slice := range v.([][]byte) {
+				if len(e.resBinBufs) <= i {
+					bytes := make([]byte, len(slice)+4)
+					bytesPtr := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&bytes)).Data)
+					b, err := ptr.NewBytesReadWriter(bytesPtr, int64(len(slice)+4), int64(len(slice)+4))
+					//XXX error handling
+					if err != nil {
+						panic(err)
+					}
+					e.resBinBufs = append(e.resBinBufs, b)
+				}
+
+				size := make([]byte, 4)
+				binary.LittleEndian.PutUint32(size, uint32(len(slice)))
+				slice = append(size,slice...)
+				e.resBinBufs[i].Write(slice)
+
+				*((**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (*C.char)(e.resBinBufs[i].BufferPtr())
+			}
+			e.req.res_len = (C.uint64_t)(len(v.([][]byte)))
 		} else {
-			bytes := make([]byte, len(v.([]byte)))
+			bytes := make([]byte, len(v.([]byte))+4)
 			bytesPtr := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&bytes)).Data)
-			b, err := ptr.NewBytesReadWriter(bytesPtr, int64(len(v.([]byte))), int64(len(v.([]byte))))
+			b, err := ptr.NewBytesReadWriter(bytesPtr, int64(len(v.([]byte))+4), int64(len(v.([]byte))+4))
 			//XXX error handling
 			if err != nil {
 				panic(err)
 			}
 			e.resBinBufs = append(e.resBinBufs, b)
-			e.resBinBufs[0].Write(v.([]byte))
-			*((*C.uint32_t)(unsafe.Pointer(e.resBuf))) = (C.uint32_t)(len(v.([]byte)))
-			*((**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(C.sizeof_uint32_t)))) = (*C.char)(e.resBinBufs[0].BufferPtr())
+			slice := make([]byte,4)
+			binary.LittleEndian.PutUint32(slice, uint32(len(v.([]byte))))
+			slice = append(slice,v.([]byte)...)
+			e.resBinBufs[0].Write(slice)
+			*((**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf))))) = (*C.char)(e.resBinBufs[0].BufferPtr())
 			e.resBufLen = uint32(len(v.([]byte)))
 			e.req.res_len = (C.uint64_t)(1)
 		}
