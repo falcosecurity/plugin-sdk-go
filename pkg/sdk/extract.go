@@ -38,7 +38,6 @@ import "C"
 import (
 	"unsafe"
 	"reflect"
-	"encoding/binary"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
 )
@@ -50,8 +49,8 @@ const (
 )
 
 type ConstSizedBuffer = struct {
-        Buf     []byte
         Size    uint32
+        Buf     []byte
 }
 
 // ExtractRequest represents an high-level abstraction that wraps a pointer to
@@ -217,46 +216,29 @@ func (e *extractRequest) SetValue(v interface{}) {
 
 	case FieldTypeIPv4Net, FieldTypeIPv6Addr, FieldTypeIPv6Net:
 		if e.req.flist {
-			if e.resBufLen < uint32(len(v.([][]byte))) {
+			if e.resBufLen < uint32(len(v.([]ConstSizedBuffer))) {
 				C.free(unsafe.Pointer(e.resBuf))
-				e.resBufLen = uint32(len(v.([][]byte)))
+				e.resBufLen = uint32(len(v.([]ConstSizedBuffer)))
 				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)((e.resBufLen) * C.sizeof_field_result_t)))
 			}
-			for i, slice := range v.([][]byte) {
-				if len(e.resBinBufs) <= i {
-					bytes := make([]byte, len(slice)+4)
-					bytesPtr := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&bytes)).Data)
-					b, err := ptr.NewBytesReadWriter(bytesPtr, int64(len(slice)+4), int64(len(slice)+4))
-					//XXX error handling
-					if err != nil {
-						panic(err)
-					}
-					e.resBinBufs = append(e.resBinBufs, b)
+			for i, goBuf := range v.([]ConstSizedBuffer) {
+				cBuf := C.struct_const_sized_buffer{
+					len: C.uint32_t(goBuf.Size),
+					ptr:  unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&goBuf.Buf)).Data),
 				}
-
-				size := make([]byte, 4)
-				binary.LittleEndian.PutUint32(size, uint32(len(slice)))
-				slice = append(size,slice...)
-				e.resBinBufs[i].Write(slice)
-
-				*((**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (*C.char)(e.resBinBufs[i].BufferPtr())
+				*((**C.struct_const_sized_buffer)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (*C.const_sized_buffer)(&cBuf)
 			}
-			e.req.res_len = (C.uint64_t)(len(v.([][]byte)))
+			e.req.res_len = (C.uint64_t)(len(v.([]ConstSizedBuffer)))
 		} else {
-			bytes := make([]byte, len(v.([]byte))+4)
-			bytesPtr := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&bytes)).Data)
-			b, err := ptr.NewBytesReadWriter(bytesPtr, int64(len(v.([]byte))+4), int64(len(v.([]byte))+4))
-			//XXX error handling
-			if err != nil {
-				panic(err)
+			goBuf := v.(ConstSizedBuffer)
+
+			cBuf := C.struct_const_sized_buffer{
+				len: C.uint32_t(goBuf.Size),
+				ptr:  unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&goBuf.Buf)).Data),
 			}
-			e.resBinBufs = append(e.resBinBufs, b)
-			slice := make([]byte,4)
-			binary.LittleEndian.PutUint32(slice, uint32(len(v.([]byte))))
-			slice = append(slice,v.([]byte)...)
-			e.resBinBufs[0].Write(slice)
-			*((**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf))))) = (*C.char)(e.resBinBufs[0].BufferPtr())
-			e.resBufLen = uint32(len(v.([]byte)))
+
+			*((**C.struct_const_sized_buffer)(unsafe.Pointer(unsafe.Pointer(e.resBuf)))) = (*C.const_sized_buffer)(&cBuf)
+
 			e.req.res_len = (C.uint64_t)(1)
 		}
 
