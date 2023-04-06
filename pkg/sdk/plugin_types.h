@@ -87,11 +87,10 @@ typedef struct ss_plugin_event
 } ss_plugin_event;
 
 //XXX add some comments here
-struct const_sized_buffer {
+typedef struct ss_plugin_byte_buffer {
 	uint32_t len;
 	const void* ptr;
-};
-typedef struct const_sized_buffer const_sized_buffer;
+} ss_plugin_byte_buffer;
 
 // Used in extract_fields functions below to receive a field/arg
 // pair and return an extracted value.
@@ -143,7 +142,7 @@ typedef struct ss_plugin_extract_field
 		uint64_t* u64;
 		uint32_t* u32;
 		bool* boolean;
-		const_sized_buffer** buf;
+		ss_plugin_byte_buffer* buf;
 	} res;
 	uint64_t res_len;
 

@@ -30,7 +30,7 @@ typedef union {
 	uint64_t u64;
 	uint32_t u32;
 	bool boolean;
-	const_sized_buffer* buf;
+	ss_plugin_byte_buffer buf;
 } field_result_t;
 
 */
@@ -222,22 +222,23 @@ func (e *extractRequest) SetValue(v interface{}) {
 				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)((e.resBufLen) * C.sizeof_field_result_t)))
 			}
 			for i, goBuf := range v.([]ConstSizedBuffer) {
-				cBuf := C.struct_const_sized_buffer{
+				cBuf := C.struct_ss_plugin_byte_buffer{
 					len: C.uint32_t(goBuf.Size),
 					ptr:  unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&goBuf.Buf)).Data),
 				}
-				*((**C.struct_const_sized_buffer)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (*C.const_sized_buffer)(&cBuf)
+
+				*((*C.struct_ss_plugin_byte_buffer)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (C.struct_ss_plugin_byte_buffer)(cBuf)
 			}
 			e.req.res_len = (C.uint64_t)(len(v.([]ConstSizedBuffer)))
 		} else {
 			goBuf := v.(ConstSizedBuffer)
 
-			cBuf := C.struct_const_sized_buffer{
+			cBuf := C.struct_ss_plugin_byte_buffer{
 				len: C.uint32_t(goBuf.Size),
 				ptr:  unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&goBuf.Buf)).Data),
 			}
 
-			*((**C.struct_const_sized_buffer)(unsafe.Pointer(unsafe.Pointer(e.resBuf)))) = (*C.const_sized_buffer)(&cBuf)
+			*((*C.struct_ss_plugin_byte_buffer)(unsafe.Pointer(e.resBuf))) = (C.struct_ss_plugin_byte_buffer)(cBuf)
 
 			e.req.res_len = (C.uint64_t)(1)
 		}

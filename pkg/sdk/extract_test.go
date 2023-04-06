@@ -77,7 +77,7 @@ func getBinResSSPluingExtractField(t *testing.T, p *_Ctype_ss_plugin_extract_fie
 	}
 
 	bufListPtr := *(*unsafe.Pointer)(unsafe.Pointer(&p.res))
-	curBufPtr := *(*unsafe.Pointer)(unsafe.Pointer(uintptr(bufListPtr) + uintptr(index*_Ciconst_sizeof_field_result_t)))
+	curBufPtr := (unsafe.Pointer)(unsafe.Pointer(uintptr(bufListPtr) + uintptr(index*_Ciconst_sizeof_field_result_t)))
 	size := *(*uint32)(curBufPtr)
 	buf := make([]byte, size)
 	ptrBytes := *(*unsafe.Pointer)(unsafe.Pointer(uintptr(curBufPtr) + uintptr(8)))
