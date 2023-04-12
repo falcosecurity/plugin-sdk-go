@@ -64,7 +64,7 @@ func TestInfo(t *testing.T) {
 		t.Errorf("(version) expected %s, but found %s", testStr, resStr)
 	}
 
-	SetRequiredAPIVersion("2.2.2")
+	SetRequiredAPIVersion(testRequiredApiveresion)
 	resStr = ptr.GoString(unsafe.Pointer(plugin_get_required_api_version()))
 	if resStr != testRequiredApiveresion {
 		t.Errorf("(requiredApiVersion) expected %s, but found %s", testStr, resStr)
