@@ -15,5 +15,7 @@ limitations under the License.
 */
 
 #pragma once
+#include "stdbool.h"
 
 const char* get_default_required_api_version();
+const char* check_version_compatible(const char* str);

@@ -82,6 +82,23 @@ typedef struct
 	//
 	const char *(*get_required_api_version)();
 
+
+	//
+	// Check if user requested version is compatible with the version used by this plugin.
+	// Required: no
+	// Arguments:
+	// - requested_version: The requested version with which the check should be performed.
+	// Return value: 
+	// - Sucess: an empty string ("").
+	// - Failure: string containing error message.
+
+	// Failures can occur in various scenarios. for example
+	// - When requested_version doesn't adhere semver approch.
+	// - When there are disagreements between major,minor,patch version numbers of
+	//   this plugin and requested versions.	 	   
+	const char*(*check_version_compatible)(const char* requested_version);
+	
+	
 	//
 	// Return a string representation of a schema describing the data expected
 	// to be passed as a configuration during the plugin initialization.

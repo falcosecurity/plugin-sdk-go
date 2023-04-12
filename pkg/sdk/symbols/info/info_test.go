@@ -25,6 +25,7 @@ import (
 )
 
 var testStr = "test"
+var testRequiredApiveresion = "3.0.0"
 var testU32 = uint32(1)
 var testStrSlice = []string{"hello", "world"}
 
@@ -63,9 +64,9 @@ func TestInfo(t *testing.T) {
 		t.Errorf("(version) expected %s, but found %s", testStr, resStr)
 	}
 
-	SetRequiredAPIVersion(testStr)
+	SetRequiredAPIVersion("2.2.2")
 	resStr = ptr.GoString(unsafe.Pointer(plugin_get_required_api_version()))
-	if resStr != testStr {
+	if resStr != testRequiredApiveresion {
 		t.Errorf("(requiredApiVersion) expected %s, but found %s", testStr, resStr)
 	}
 
