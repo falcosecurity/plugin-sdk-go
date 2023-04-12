@@ -27,6 +27,16 @@ limitations under the License.
 //	char* get_event_source();
 //	char* get_extract_event_sources();
 //
+//	uint32_t get_type();
+//	uint32_t get_id();
+//	char* get_name();
+//	char* get_description();
+//	char* get_contact();
+//	char* get_version();
+//	char* get_required_api_version();
+//	char* get_event_source();
+//	char* get_extract_event_sources();
+//
 // In almost all cases, your plugin should import this module, unless
 // your plugin exports those symbols by other means.
 package info
@@ -37,6 +47,7 @@ package info
 import "C"
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
 )
@@ -106,11 +117,26 @@ func plugin_get_required_api_version() *C.char {
 	return (*C.char)(pRequiredAPIVersion.CharPtr())
 }
 
+func string_split(version string) (string, string, string) {
+	nums := strings.Split(version, ".")
+	if len(nums) != 3 {
+		panic("Incorrect format. Expected: Semantic Versioning: X.Y.Z")
+	}
+	return nums[0], nums[1], nums[2]
+}
+
 func SetRequiredAPIVersion(apiVer string) {
-	result := (*C.char)(C.check_version_compatible(C.CString(apiVer)))
-	err := C.GoString(result)
-	if err != "" {
-		panic(err)
+	requiredMajor, requiredMinor, requiredPatch := string_split(apiVer)
+	pluginMajor, pluginMinor, pluginPatch := string_split(C.GoString(plugin_get_required_api_version()))
+
+	if pluginMajor != requiredMajor {
+		panic("Plugin sdk's Major version disagrees. Expected: Major version should be equal to " + pluginMajor + "but got " + requiredMajor)
+	}
+	if pluginMinor < requiredMinor {
+		panic("Plugin sdk's Minor version disagrees. Expected: Minor version should be less than " + pluginMinor + "but got " + requiredMinor)
+	}
+	if pluginMajor != requiredMajor && pluginPatch < requiredPatch {
+		panic("Plugin sdk's Patch version disagrees. Expected: Minor version should be less than " + pluginMinor + "but got " + requiredMinor)
 	}
 	pRequiredAPIVersion.Write(apiVer)
 }
