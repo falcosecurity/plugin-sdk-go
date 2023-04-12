@@ -16,15 +16,16 @@ limitations under the License.
 
 // This package exports a set of C functions that provide general
 // information about the plugin. The exported functions are:
-//      uint32_t get_type();
-//      uint32_t get_id();
-//      char* get_name();
-//      char* get_description();
-//      char* get_contact();
-//      char* get_version();
-//      char* get_required_api_version();
-//      char* get_event_source();
-//      char* get_extract_event_sources();
+//
+//	uint32_t get_type();
+//	uint32_t get_id();
+//	char* get_name();
+//	char* get_description();
+//	char* get_contact();
+//	char* get_version();
+//	char* get_required_api_version();
+//	char* get_event_source();
+//	char* get_extract_event_sources();
 //
 // In almost all cases, your plugin should import this module, unless
 // your plugin exports those symbols by other means.
@@ -106,6 +107,11 @@ func plugin_get_required_api_version() *C.char {
 }
 
 func SetRequiredAPIVersion(apiVer string) {
+	result := (*C.char)(C.check_version_compatible(C.CString(apiVer)))
+	err := C.GoString(result)
+	if err != "" {
+		panic(err)
+	}
 	pRequiredAPIVersion.Write(apiVer)
 }
 
