@@ -107,7 +107,7 @@ func plugin_get_required_api_version() *C.char {
 	return (*C.char)(pRequiredAPIVersion.CharPtr())
 }
 
-func string_split(version string) (string, string, string) {
+func splitVersionString(version string) (string, string, string) {
 	nums := strings.Split(version, ".")
 	if len(nums) != 3 {
 		panic("Incorrect format. Expected: Semantic Versioning: X.Y.Z")
@@ -116,17 +116,17 @@ func string_split(version string) (string, string, string) {
 }
 
 func SetRequiredAPIVersion(apiVer string) {
-	requiredMajor, requiredMinor, requiredPatch := string_split(apiVer)
-	pluginMajor, pluginMinor, pluginPatch := string_split(C.GoString(plugin_get_required_api_version()))
+	requiredMajor, requiredMinor, requiredPatch := splitVersionString(apiVer)
+	pluginMajor, pluginMinor, pluginPatch := splitVersionString(C.GoString(C.get_default_required_api_version()))
 
 	if pluginMajor != requiredMajor {
-		panic("Plugin sdk's Major version disagrees. Expected: Major version should be equal to " + pluginMajor + "but got " + requiredMajor)
+		panic("Plugin SDK Go required API version incompatible major number. Expected: Major version should be equal to " + pluginMajor + " but got " + requiredMajor)
 	}
 	if pluginMinor < requiredMinor {
-		panic("Plugin sdk's Minor version disagrees. Expected: Minor version should be less than " + pluginMinor + "but got " + requiredMinor)
+		panic("Plugin SDK Go required API version incompatible minor number. Expected: Minor version should be less than/equal to " + pluginMinor + " but got " + requiredMinor)
 	}
-	if pluginMajor != requiredMajor && pluginPatch < requiredPatch {
-		panic("Plugin sdk's Patch version disagrees. Expected: Minor version should be less than " + pluginMinor + "but got " + requiredMinor)
+	if pluginMajor == requiredMajor && pluginPatch < requiredPatch {
+		panic("Plugin SDK Go required API version incompatible patch number. Expected: Patch version should be less than/equal to " + pluginPatch + " but got " + requiredPatch)
 	}
 	pRequiredAPIVersion.Write(apiVer)
 }
