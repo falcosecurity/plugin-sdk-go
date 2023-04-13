@@ -22,6 +22,7 @@ import (
 	"unsafe"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
+	"github.com/stretchr/testify/assert"
 )
 
 var testStr = "test"
@@ -102,4 +103,50 @@ func TestInfo(t *testing.T) {
 	if resStr != expectedStr {
 		t.Errorf("(extractEventSources) expected %s, but found %s", testStr, resStr)
 	}
+}
+
+func TestSemver(t *testing.T) {
+	t.Run("success_check", func(t *testing.T) {
+		version := "2.0.0"
+		panicFunc := func() {
+			SetRequiredAPIVersion(version)
+		}
+		assert.NotPanics(t, panicFunc)
+	})
+
+	t.Run("invalid_version", func(t *testing.T) {
+		version := "invalid"
+		errMsg := "Incorrect format. Expected: Semantic Versioning: X.Y.Z"
+		panicFunc := func() {
+			SetRequiredAPIVersion(version)
+		}
+		assert.PanicsWithValue(t, errMsg, panicFunc)
+	})
+
+	t.Run("incompatible_major_number", func(t *testing.T) {
+		version := "3.0.0"
+		errMsg := "Plugin SDK Go required API version incompatible major number. Expected: Major version should be equal to 2 but got 3"
+		panicFunc := func() {
+			SetRequiredAPIVersion(version)
+		}
+		assert.PanicsWithValue(t, errMsg, panicFunc)
+	})
+
+	t.Run("incompatible_minor_number", func(t *testing.T) {
+		version := "2.1.0"
+		errMsg := "Plugin SDK Go required API version incompatible minor number. Expected: Minor version should be less than/equal to 0 but got 1"
+		panicFunc := func() {
+			SetRequiredAPIVersion(version)
+		}
+		assert.PanicsWithValue(t, errMsg, panicFunc)
+	})
+
+	t.Run("incompatible_patch_number", func(t *testing.T) {
+		version := "2.0.3"
+		errMsg := "Plugin SDK Go required API version incompatible patch number. Expected: Patch version should be less than/equal to 0 but got 3"
+		panicFunc := func() {
+			SetRequiredAPIVersion(version)
+		}
+		assert.PanicsWithValue(t, errMsg, panicFunc)
+	})
 }
