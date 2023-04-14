@@ -116,17 +116,19 @@ func splitVersionString(version string) (string, string, string) {
 }
 
 func SetRequiredAPIVersion(apiVer string) {
-	requiredMajor, requiredMinor, requiredPatch := splitVersionString(apiVer)
-	pluginMajor, pluginMinor, pluginPatch := splitVersionString(C.GoString(C.get_default_required_api_version()))
+	if apiVer != "" {
+		requiredMajor, requiredMinor, requiredPatch := splitVersionString(apiVer)
+		pluginMajor, pluginMinor, pluginPatch := splitVersionString(C.GoString(C.get_default_required_api_version()))
 
-	if pluginMajor != requiredMajor {
-		panic("Plugin SDK Go required API version incompatible major number. Expected: Major version should be equal to " + pluginMajor + " but got " + requiredMajor)
-	}
-	if pluginMinor < requiredMinor {
-		panic("Plugin SDK Go required API version incompatible minor number. Expected: Minor version should be less than/equal to " + pluginMinor + " but got " + requiredMinor)
-	}
-	if pluginMinor == requiredMinor && pluginPatch < requiredPatch {
-		panic("Plugin SDK Go required API version incompatible patch number. Expected: Patch version should be less than/equal to " + pluginPatch + " but got " + requiredPatch)
+		if pluginMajor != requiredMajor {
+			panic("Plugin SDK Go required API version incompatible major number. Expected: Major version should be equal to " + pluginMajor + " but got " + requiredMajor)
+		}
+		if pluginMinor < requiredMinor {
+			panic("Plugin SDK Go required API version incompatible minor number. Expected: Minor version should be less than/equal to " + pluginMinor + " but got " + requiredMinor)
+		}
+		if pluginMinor == requiredMinor && pluginPatch < requiredPatch {
+			panic("Plugin SDK Go required API version incompatible patch number. Expected: Patch version should be less than/equal to " + pluginPatch + " but got " + requiredPatch)
+		}
 	}
 	pRequiredAPIVersion.Write(apiVer)
 }

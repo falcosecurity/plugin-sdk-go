@@ -114,6 +114,14 @@ func TestSemver(t *testing.T) {
 		assert.NotPanics(t, panicFunc)
 	})
 
+	t.Run("default_version", func(t *testing.T) {
+		version := ""
+		panicFunc := func() {
+			SetRequiredAPIVersion(version)
+		}
+		assert.NotPanics(t, panicFunc)
+	})
+
 	t.Run("invalid_version", func(t *testing.T) {
 		version := "invalid"
 		errMsg := "Incorrect format. Expected: Semantic Versioning: X.Y.Z"
