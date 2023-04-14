@@ -201,19 +201,22 @@ func TestExtractRequestSetValue(t *testing.T) {
 	assertPanic(t, func() {
 		u64Req.SetValue("test")
 		u64Req.SetValue(bool(true))
+		boolReq.SetValue([]byte{ 0x41, 0x41, 0x41, 0x41})
 	})
 	assertPanic(t, func() {
 		strReq.SetValue(uint64(1))
 		strReq.SetValue(bool(true))
+		boolReq.SetValue([]byte{ 0x41, 0x41, 0x41, 0x41})
 	})
 	assertPanic(t, func() {
 		boolReq.SetValue(uint64(1))
 		boolReq.SetValue("test")
+		boolReq.SetValue([]byte{ 0x41, 0x41, 0x41, 0x41})
 	})
 	assertPanic(t, func() {
 		binReq.SetValue(uint64(1))
 		binReq.SetValue("test")
-		//XXX add other values
+		binReq.SetValue(bool(true))
 	})
 
 	// check set correct values
