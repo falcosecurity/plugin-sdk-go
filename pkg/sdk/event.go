@@ -29,6 +29,9 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
 )
 
+const pluginEventCode = 322
+const pluginEventHeaderSize = C.sizeof_ss_plugin_event + 4 + 4 + 4
+
 // EventWriter can be used to represent events produced by a plugin.
 // This interface is meant to be used in the next/next_batch.
 //
@@ -113,7 +116,8 @@ type EventWriters interface {
 }
 
 type eventWriters struct {
-	evts []*eventWriter
+	evts    []*eventWriter
+	evtPtrs **C.ss_plugin_event
 }
 
 // NewEventWriters creates a new instance of sdk.EventWriters.
@@ -129,16 +133,16 @@ func NewEventWriters(size, dataSize int64) (EventWriters, error) {
 	}
 
 	ret := &eventWriters{
-		evts: make([]*eventWriter, size),
+		evts:    make([]*eventWriter, size),
+		evtPtrs: (**C.ss_plugin_event)(C.malloc((C.size_t)(size * C.sizeof_uintptr_t))),
 	}
-	pluginEvtArray := (*C.ss_plugin_event)(C.malloc((C.size_t)(size * C.sizeof_ss_plugin_event)))
+
 	var err error
 	for i := range ret.evts {
-		// get i-th element of pluginEvtArray
-		evtPtr := unsafe.Pointer(uintptr(unsafe.Pointer(pluginEvtArray)) + uintptr(i*C.sizeof_ss_plugin_event))
-		if ret.evts[i], err = newEventWriter(evtPtr, dataSize); err != nil {
+		if ret.evts[i], err = newEventWriter(dataSize); err != nil {
 			return nil, err
 		}
+		*(**C.ss_plugin_event)(unsafe.Pointer(uintptr(unsafe.Pointer(ret.evtPtrs)) + uintptr(i*C.sizeof_uintptr_t))) = ret.evts[i].ssPluginEvt
 	}
 	return ret, nil
 }
@@ -159,28 +163,34 @@ func (p *eventWriters) Free() {
 }
 
 func (p *eventWriters) ArrayPtr() unsafe.Pointer {
-	return p.evts[0].ssPluginEvt
+	return unsafe.Pointer(p.evtPtrs)
 }
 
 type eventWriter struct {
 	data        ptr.BytesReadWriter
 	dataSize    int64
-	ssPluginEvt unsafe.Pointer
+	ssPluginEvt *C.ss_plugin_event
 }
 
-func newEventWriter(evtPtr unsafe.Pointer, dataSize int64) (*eventWriter, error) {
-	evt := (*C.ss_plugin_event)(evtPtr)
+func newEventWriter(dataSize int64) (*eventWriter, error) {
+	evt := (*C.ss_plugin_event)(C.calloc(1, C.size_t(dataSize+pluginEventHeaderSize)))
+	evt._type = pluginEventCode
 	evt.ts = C.uint64_t(C.UINT64_MAX)
-	evt.data = (*C.uint8_t)(C.malloc(C.size_t(dataSize)))
-	evt.datalen = 0
-	brw, err := ptr.NewBytesReadWriter(unsafe.Pointer(evt.data), int64(dataSize), int64(dataSize))
-
+	evt.tid = C.uint64_t(C.UINT64_MAX)
+	evt.len = (C.uint32_t)(pluginEventHeaderSize)
+	// todo(jasondellaluce): CGO fails to properly encode nparams for reasons
+	*(*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(evt)) + 22)) = 2
+	*(*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(evt)) + C.sizeof_ss_plugin_event + 0)) = 4 // id size
+	*(*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(evt)) + C.sizeof_ss_plugin_event + 4)) = 0 // data size
+	// todo(jasondellaluce): how do we get the plugin ID here?
+	*(*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(evt)) + C.sizeof_ss_plugin_event + 8)) = 0 // id (puttin zero makes framework set it automatically)
+	brw, err := ptr.NewBytesReadWriter(unsafe.Pointer(uintptr(unsafe.Pointer(evt))+pluginEventHeaderSize), int64(dataSize), int64(dataSize))
 	if err != nil {
 		return nil, err
 	}
 
 	return &eventWriter{
-		ssPluginEvt: evtPtr,
+		ssPluginEvt: evt,
 		data:        brw,
 		dataSize:    dataSize,
 	}, nil
@@ -189,7 +199,8 @@ func newEventWriter(evtPtr unsafe.Pointer, dataSize int64) (*eventWriter, error)
 func (p *eventWriter) Writer() io.Writer {
 	p.data.SetLen(p.dataSize)
 	p.data.Seek(0, io.SeekStart)
-	(*C.ss_plugin_event)(p.ssPluginEvt).datalen = 0
+	p.ssPluginEvt.len = (C.uint32_t)(pluginEventHeaderSize)
+	*(*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(p.ssPluginEvt)) + C.sizeof_ss_plugin_event + 4)) = 0
 	return p
 }
 
@@ -198,7 +209,8 @@ func (p *eventWriter) Write(data []byte) (n int, err error) {
 	if err != nil {
 		return
 	}
-	(*C.ss_plugin_event)(p.ssPluginEvt).datalen += C.uint32_t(n)
+	p.ssPluginEvt.len += C.uint32_t(n)
+	*(*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(p.ssPluginEvt)) + C.sizeof_ss_plugin_event + 4)) += C.uint32_t(n)
 	return
 }
 
@@ -207,26 +219,30 @@ func (p *eventWriter) SetTimestamp(value uint64) {
 }
 
 func (p *eventWriter) free() {
-	C.free(unsafe.Pointer((*C.ss_plugin_event)(p.ssPluginEvt).data))
+	C.free(unsafe.Pointer(p.ssPluginEvt))
 	p.data = nil
 }
 
-type eventReader C.ss_plugin_event
+type eventReader C.ss_plugin_event_input
 
-// NewEventReader wraps a pointer to a ss_plugin_event C structure to create
+// NewEventReader wraps a pointer to a ss_plugin_event_input C structure to create
 // a new instance of EventReader. It's not possible to check that the pointer is valid.
 // Passing an invalid pointer may cause undefined behavior.
-func NewEventReader(ssPluginEvt unsafe.Pointer) EventReader {
-	return (*eventReader)(ssPluginEvt)
+func NewEventReader(ssPluginEvtInput unsafe.Pointer) EventReader {
+	return (*eventReader)(ssPluginEvtInput)
 }
 
 func (e *eventReader) Reader() io.ReadSeeker {
-	brw, _ := ptr.NewBytesReadWriter(unsafe.Pointer(e.data), int64(e.datalen), int64(e.datalen))
+	if e.evt._type != pluginEventCode {
+		panic("NOT A PLUGINEVENT")
+	}
+	datalen := *(*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(e.evt)) + C.sizeof_ss_plugin_event + 4))
+	brw, _ := ptr.NewBytesReadWriter(unsafe.Pointer(uintptr(unsafe.Pointer(e.evt))+pluginEventHeaderSize), int64(datalen), int64(datalen))
 	return brw
 }
 
 func (e *eventReader) Timestamp() uint64 {
-	return uint64(e.ts)
+	return uint64(e.evt.ts)
 }
 
 func (e *eventReader) EventNum() uint64 {

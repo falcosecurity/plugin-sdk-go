@@ -52,7 +52,7 @@ void async_deinit()
 
 // Defined in extract.go
 extern int32_t plugin_extract_fields_sync(ss_plugin_t *s,
-										  const ss_plugin_event *evt,
+										  const ss_plugin_event_input *evt,
 										  uint32_t num_fields,
 										  ss_plugin_extract_field *fields);
 
@@ -60,7 +60,7 @@ extern int32_t plugin_extract_fields_sync(ss_plugin_t *s,
 // non-NULL, it calls the async extractor function. Otherwise, it
 // calls the synchronous extractor function.
 FALCO_PLUGIN_SDK_PUBLIC int32_t plugin_extract_fields(ss_plugin_t *s,
-							  const ss_plugin_event *evt,
+							  const ss_plugin_event_input *evt,
 							  uint32_t num_fields,
 							  ss_plugin_extract_field *fields)
 {

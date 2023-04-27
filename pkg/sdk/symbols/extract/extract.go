@@ -38,7 +38,7 @@ import (
 )
 
 //export plugin_extract_fields_sync
-func plugin_extract_fields_sync(plgState C.uintptr_t, evt *C.ss_plugin_event, numFields uint32, fields *C.ss_plugin_extract_field) int32 {
+func plugin_extract_fields_sync(plgState C.uintptr_t, evt *C.ss_plugin_event_input, numFields uint32, fields *C.ss_plugin_extract_field) int32 {
 	pHandle := cgo.Handle(plgState)
 	extract := pHandle.Value().(sdk.Extractor)
 	extrReqs := pHandle.Value().(sdk.ExtractRequests)

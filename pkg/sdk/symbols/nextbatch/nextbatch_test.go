@@ -68,7 +68,7 @@ func TestNextBatch(t *testing.T) {
 	// generic testing callback
 	doTest := func(name string, res int32, num uint32, ptr unsafe.Pointer, err error) {
 		var resNum uint32
-		var resPtr *_Ctype_ss_plugin_event
+		var resPtr **_Ctype_ss_plugin_event
 		r := plugin_next_batch(_Ctype_uintptr_t(handle), _Ctype_uintptr_t(handle), &resNum, &resPtr)
 		if r != res {
 			t.Errorf("(%s - res): expected %d, but found %d", name, res, r)

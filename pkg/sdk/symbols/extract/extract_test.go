@@ -76,8 +76,8 @@ func allocSSPluginExtractField(fid, ftype uint32, fname, farg string) (*_Ctype_s
 	}
 }
 
-func allocSSPluginEvent(num, ts uint64, data []byte) (*_Ctype_struct_ss_plugin_event, func()) {
-	ret := &_Ctype_struct_ss_plugin_event{}
+func allocSSPluginEvent(num, ts uint64, data []byte) (*_Ctype_struct_ss_plugin_event_input, func()) {
+	ret := &_Ctype_struct_ss_plugin_event_input{}
 	ret.evtnum = _Ctype_uint64_t(num)
 	ret.ts = _Ctype_uint64_t(ts)
 	ret.data = (*_Ctype_uint8_t)(&data[0])

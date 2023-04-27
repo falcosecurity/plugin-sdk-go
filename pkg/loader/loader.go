@@ -85,7 +85,7 @@ static const char* __event_to_string(plugin_api* p, ss_plugin_t *s, const ss_plu
     return p->event_to_string(s, e);
 }
 
-static ss_plugin_rc __next_batch(plugin_api* p, ss_plugin_t* s, ss_instance_t* h, uint32_t *n, ss_plugin_event **e)
+static ss_plugin_rc __next_batch(plugin_api* p, ss_plugin_t* s, ss_instance_t* h, uint32_t *n, ss_plugin_event ***e)
 {
     return p->next_batch(s, h, n, e);
 }

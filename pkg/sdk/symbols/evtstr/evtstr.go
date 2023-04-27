@@ -38,7 +38,7 @@ import (
 )
 
 //export plugin_event_to_string
-func plugin_event_to_string(pState C.uintptr_t, evt *C.ss_plugin_event) *C.char {
+func plugin_event_to_string(pState C.uintptr_t, evt *C.ss_plugin_event_input) *C.char {
 	buf := cgo.Handle(pState).Value().(sdk.StringerBuffer).StringerBuffer()
 	stringer, ok := cgo.Handle(pState).Value().(sdk.Stringer)
 	if ok {
