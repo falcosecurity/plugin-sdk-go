@@ -130,7 +130,6 @@ func TestExtractRequestSetValue(t *testing.T) {
 	testStrList := make([]string, 0)
 	testU64List := make([]uint64, 0)
 	testBoolList := make([]bool, 0)
-	//XXX check int32 -> int conversion
 	dataArray := make([]byte, (minResultBufferLen+1)*int(testIPv6.Size))
 	for i := 0; i < (minResultBufferLen+1)*int(testIPv6.Size); i++ {
 		dataArray[i] = byte(i)
