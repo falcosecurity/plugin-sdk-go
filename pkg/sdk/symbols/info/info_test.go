@@ -28,7 +28,7 @@ import (
 var testStr = "test"
 var testU32 = uint32(1)
 var testStrSlice = []string{"hello", "world"}
-var testversion = "2.0.0"
+var testversion = "2.1.0"
 
 func TestInfo(t *testing.T) {
 	var resU32 uint32
@@ -141,7 +141,7 @@ func TestSemver(t *testing.T) {
 	})
 
 	t.Run("incompatible_minor_number", func(t *testing.T) {
-		version := "2.1.0"
+		version := "2.2.0"
 		errMsg := "Plugin SDK Go required API version incompatible minor number. Expected: Minor version should be less than/equal to 0 but got 1"
 		panicFunc := func() {
 			SetRequiredAPIVersion(version)

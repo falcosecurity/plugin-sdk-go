@@ -86,7 +86,6 @@ typedef struct ss_plugin_event
 	uint64_t ts;
 } ss_plugin_event;
 
-//XXX add some comments here
 typedef struct ss_plugin_byte_buffer {
 	uint32_t len;
 	const void* ptr;
