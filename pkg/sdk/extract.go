@@ -29,15 +29,17 @@ typedef union {
 	const char* str;
 	uint64_t u64;
 	uint32_t u32;
-	bool boolean;
+	ss_plugin_bool boolean;
 	ss_plugin_byte_buffer buf;
 } field_result_t;
 
 */
 import "C"
 import (
-	"unsafe"
+	"net"
 	"reflect"
+	"time"
+	"unsafe"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
 )
@@ -47,11 +49,6 @@ const (
 	// for a each extractRequest struct.
 	minResultBufferLen = 512
 )
-
-type ConstSizedBuffer = struct {
-        Size    uint32
-        Buf     []byte
-}
 
 // ExtractRequest represents an high-level abstraction that wraps a pointer to
 // a ss_plugin_extract_field C structure, providing methods for accessing its
@@ -63,15 +60,13 @@ type ExtractRequest interface {
 	//
 	// FieldType returns the type of the field for which the value extraction
 	// is requested. For now, the supported types are:
-	// - sdk.FieldTypeUint64
-	// - sdk.FieldTypeCharBuf
-	// - sdk.FieldTypeIPv4Addr
-	// - sdk.FieldTypeRelTime
-	// - sdk.FieldTypeAbsTime
-	// - sdk.FieldTypeBool
-	// - sdk.FieldTypeIPv4Net
-	// - sdk.FieldTypeIPv6Addr
-	// - sdk.FieldTypeIPv6Net
+	//  - sdk.FieldTypeBool
+	//  - sdk.FieldTypeUint64
+	//  - sdk.FieldTypeCharBuf
+	//  - sdk.FieldTypeRelTime
+	//  - sdk.FieldTypeAbsTime
+	//  - sdk.FieldTypeIPAddr
+	//  - sdk.FieldTypeIPNet
 	FieldType() uint32
 	//
 	// Field returns the name of the field for which the value extraction
@@ -97,6 +92,17 @@ type ExtractRequest interface {
 	// The underlying type of v must be compatible with the field type
 	// associated to this extract request (as the returned by FieldType()),
 	// otherwise SetValue will panic.
+	//
+	// Coherently to the FieldType of the extraction request, this function
+	// panics if the passed value is not one of the following types (or slices
+	// of them, in case IsList() returns true):
+	//  - sdk.FieldTypeBool: bool
+	//  - sdk.FieldTypeUint64: uint64
+	//  - sdk.FieldTypeCharBuf: string
+	//  - sdk.FieldTypeRelTime: time.Duration, *time.Duration
+	//  - sdk.FieldTypeAbsTime: time.Time, *time.Time
+	//  - sdk.FieldTypeIPAddr: net.IP, *net.IP
+	//  - sdk.FieldTypeIPNet: net.IPNet, *net.IPNet
 	SetValue(v interface{})
 	//
 	// SetPtr sets a pointer to a ss_plugin_extract_field C structure to
@@ -129,6 +135,11 @@ func (e *extractRequestPool) Get(requestIndex int) ExtractRequest {
 			resBuf:     (*C.field_result_t)(C.malloc((C.size_t)(minResultBufferLen * C.sizeof_field_result_t))),
 			resBufLen:  minResultBufferLen,
 			resStrBufs: []StringBuffer{&ptr.StringBuffer{}},
+			resValPtrs: make([]unsafe.Pointer, minResultBufferLen),
+		}
+		for i := 0; i < minResultBufferLen; i++ {
+			ptr := (*C.field_result_t)(unsafe.Pointer(uintptr(unsafe.Pointer(r.resBuf)) + uintptr(i*C.sizeof_field_result_t)))
+			r.resValPtrs[i] = unsafe.Pointer(ptr)
 		}
 		e.reqs[uint(requestIndex)] = r
 	}
@@ -162,6 +173,8 @@ type extractRequest struct {
 	resStrBufs []StringBuffer
 	// List of BytesReadWriter to return binary results
 	resBinBufs []ptr.BytesReadWriter
+	// List of *field_result_t to be filled with the values of a request
+	resValPtrs []unsafe.Pointer
 }
 
 func (e *extractRequest) SetPtr(pef unsafe.Pointer) {
@@ -189,113 +202,159 @@ func (e *extractRequest) ArgIndex() uint64 {
 }
 
 func (e *extractRequest) ArgPresent() bool {
-	return bool(e.req.arg_present)
+	return e.req.arg_present != 0
 }
 
 func (e *extractRequest) IsList() bool {
-	return bool(e.req.flist)
+	return e.req.flist != 0
+}
+
+func (e *extractRequest) boolToU32(v bool) uint32 {
+	if v {
+		return uint32(1)
+	}
+	return uint32(0)
+}
+
+func (e *extractRequest) resizeResValPtrs(length int) []unsafe.Pointer {
+	if e.resBufLen < uint32(length) {
+		C.free(unsafe.Pointer(e.resBuf))
+		e.resBufLen = uint32(length)
+		e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)(e.resBufLen * C.sizeof_field_result_t)))
+		e.resValPtrs = make([]unsafe.Pointer, length)
+		for i := 0; i < length; i++ {
+			ptr := (*C.field_result_t)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))
+			e.resValPtrs[i] = unsafe.Pointer(ptr)
+		}
+	}
+	e.req.res_len = (C.uint64_t)(length)
+	return e.resValPtrs[:length]
 }
 
 func (e *extractRequest) SetValue(v interface{}) {
 	switch e.FieldType() {
-	case FieldTypeRelTime, FieldTypeAbsTime, FieldTypeUint64:
-		if e.req.flist {
-			if e.resBufLen < uint32(len(v.([]uint64))) {
-				C.free(unsafe.Pointer(e.resBuf))
-				e.resBufLen = uint32(len(v.([]uint64)))
-				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)(e.resBufLen * C.sizeof_field_result_t)))
+	case FieldTypeBool:
+		if e.IsList() {
+			for i, ptr := range e.resizeResValPtrs(len(v.([]bool))) {
+				*((*C.uint64_t)(ptr)) = (C.uint64_t)(e.boolToU32((v.([]bool))[i]))
 			}
-			for i, val := range v.([]uint64) {
-				*((*C.uint64_t)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (C.uint64_t)(val)
-			}
-			e.req.res_len = (C.uint64_t)(len(v.([]uint64)))
 		} else {
-			*((*C.uint64_t)(unsafe.Pointer(e.resBuf))) = (C.uint64_t)(v.(uint64))
-			e.req.res_len = (C.uint64_t)(1)
+			ptr := e.resizeResValPtrs(1)[0]
+			*((*C.uint64_t)(ptr)) = (C.uint64_t)(e.boolToU32(v.(bool)))
 		}
-
-	case FieldTypeIPv4Net, FieldTypeIPv6Addr, FieldTypeIPv6Net:
-		if e.req.flist {
-			if e.resBufLen < uint32(len(v.([]ConstSizedBuffer))) {
-				C.free(unsafe.Pointer(e.resBuf))
-				e.resBufLen = uint32(len(v.([]ConstSizedBuffer)))
-				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)((e.resBufLen) * C.sizeof_field_result_t)))
+	case FieldTypeUint64:
+		if e.IsList() {
+			for i, ptr := range e.resizeResValPtrs(len(v.([]uint64))) {
+				*((*C.uint64_t)(ptr)) = (C.uint64_t)((v.([]uint64))[i])
 			}
-			for i, goBuf := range v.([]ConstSizedBuffer) {
-				cBuf := C.struct_ss_plugin_byte_buffer{
-					len: C.uint32_t(goBuf.Size),
-					ptr:  unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&goBuf.Buf)).Data),
-				}
-
-				*((*C.struct_ss_plugin_byte_buffer)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (C.struct_ss_plugin_byte_buffer)(cBuf)
-			}
-			e.req.res_len = (C.uint64_t)(len(v.([]ConstSizedBuffer)))
 		} else {
-			goBuf := v.(ConstSizedBuffer)
-
-			cBuf := C.struct_ss_plugin_byte_buffer{
-				len: C.uint32_t(goBuf.Size),
-				ptr:  unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&goBuf.Buf)).Data),
-			}
-
-			*((*C.struct_ss_plugin_byte_buffer)(unsafe.Pointer(e.resBuf))) = (C.struct_ss_plugin_byte_buffer)(cBuf)
-
-			e.req.res_len = (C.uint64_t)(1)
+			ptr := e.resizeResValPtrs(1)[0]
+			*((*C.uint64_t)(ptr)) = (C.uint64_t)(v.(uint64))
 		}
-
 	case FieldTypeCharBuf:
-		if e.req.flist {
-			if e.resBufLen < uint32(len(v.([]string))) {
-				C.free(unsafe.Pointer(e.resBuf))
-				e.resBufLen = uint32(len(v.([]string)))
-				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)((e.resBufLen) * C.sizeof_field_result_t)))
-			}
-			for i, val := range v.([]string) {
+		if e.IsList() {
+			for i, out := range e.resizeResValPtrs(len(v.([]string))) {
 				if len(e.resStrBufs) <= i {
 					e.resStrBufs = append(e.resStrBufs, &ptr.StringBuffer{})
 				}
-				e.resStrBufs[i].Write(val)
-				*((**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (*C.char)(e.resStrBufs[i].CharPtr())
+				e.resStrBufs[i].Write(v.([]string)[i])
+				*((**C.char)(out)) = (*C.char)(e.resStrBufs[i].CharPtr())
 			}
-			e.req.res_len = (C.uint64_t)(len(v.([]string)))
 		} else {
+			out := e.resizeResValPtrs(1)[0]
 			e.resStrBufs[0].Write(v.(string))
-			*((**C.char)(unsafe.Pointer(e.resBuf))) = (*C.char)(e.resStrBufs[0].CharPtr())
-			e.req.res_len = (C.uint64_t)(1)
+			*((**C.char)(out)) = (*C.char)(e.resStrBufs[0].CharPtr())
 		}
-
-	case FieldTypeBool:
-		if e.req.flist {
-			if e.resBufLen < uint32(len(v.([]bool))) {
-				C.free(unsafe.Pointer(e.resBuf))
-				e.resBufLen = uint32(len(v.([]bool)))
-				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)(e.resBufLen * C.sizeof_field_result_t)))
+	case FieldTypeRelTime:
+		if e.IsList() {
+			if val, ok := v.([]time.Duration); ok {
+				for i, ptr := range e.resizeResValPtrs(len(val)) {
+					*((*C.uint64_t)(ptr)) = (C.uint64_t)(val[i].Nanoseconds())
+				}
+			} else {
+				for i, ptr := range e.resizeResValPtrs(len(v.([]*time.Duration))) {
+					*((*C.uint64_t)(ptr)) = (C.uint64_t)(v.([]*time.Duration)[i].Nanoseconds())
+				}
 			}
-			for i, val := range v.([]bool) {
-				*((*C.bool)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (C.bool)(val)
-			}
-			e.req.res_len = (C.uint64_t)(len(v.([]bool)))
 		} else {
-			*((*C.bool)(unsafe.Pointer(e.resBuf))) = (C.bool)(v.(bool))
-			e.req.res_len = (C.uint64_t)(1)
+			ptr := e.resizeResValPtrs(1)[0]
+			if val, ok := v.(time.Duration); ok {
+				*((*C.uint64_t)(ptr)) = (C.uint64_t)(val.Nanoseconds())
+			} else {
+				*((*C.uint64_t)(ptr)) = (C.uint64_t)(v.(*time.Duration).Nanoseconds())
+			}
 		}
-
-	case FieldTypeIPv4Addr:
-		if e.req.flist {
-			if e.resBufLen < uint32(len(v.([]uint32))) {
-				C.free(unsafe.Pointer(e.resBuf))
-				e.resBufLen = uint32(len(v.([]uint32)))
-				e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)(e.resBufLen * C.sizeof_field_result_t)))
+	case FieldTypeAbsTime:
+		if e.IsList() {
+			if val, ok := v.([]time.Time); ok {
+				for i, ptr := range e.resizeResValPtrs(len(val)) {
+					*((*C.uint64_t)(ptr)) = (C.uint64_t)(val[i].UnixNano())
+				}
+			} else {
+				for i, ptr := range e.resizeResValPtrs(len(v.([]*time.Time))) {
+					*((*C.uint64_t)(ptr)) = (C.uint64_t)(v.([]*time.Time)[i].UnixNano())
+				}
 			}
-			for i, val := range v.([]uint32) {
-				*((*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))) = (C.uint32_t)(val)
-			}
-			e.req.res_len = (C.uint64_t)(len(v.([]uint32)))
 		} else {
-			*((*C.uint32_t)(unsafe.Pointer(e.resBuf))) = (C.uint32_t)(v.(uint32))
-			e.req.res_len = (C.uint64_t)(1)
+			ptr := e.resizeResValPtrs(1)[0]
+			if val, ok := v.(time.Time); ok {
+				*((*C.uint64_t)(ptr)) = (C.uint64_t)(val.UnixNano())
+			} else {
+				*((*C.uint64_t)(ptr)) = (C.uint64_t)(v.(*time.Time).UnixNano())
+			}
 		}
-
+	case FieldTypeIPAddr:
+		if e.IsList() {
+			if val, ok := v.([]net.IP); ok {
+				for i, ptr := range e.resizeResValPtrs(len(val)) {
+					val := ([]byte)((val)[i])
+					(*C.struct_ss_plugin_byte_buffer)(ptr).len = C.uint32_t(len(val))
+					(*C.struct_ss_plugin_byte_buffer)(ptr).ptr = unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&val)).Data)
+				}
+			} else {
+				for i, ptr := range e.resizeResValPtrs(len(v.([]*net.IP))) {
+					val := ([]byte)(*(v.([]*net.IP))[i])
+					(*C.struct_ss_plugin_byte_buffer)(ptr).len = C.uint32_t(len(val))
+					(*C.struct_ss_plugin_byte_buffer)(ptr).ptr = unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&val)).Data)
+				}
+			}
+		} else {
+			var val []byte
+			ptr := e.resizeResValPtrs(1)[0]
+			if ipv, ok := v.(net.IP); ok {
+				val = ([]byte)(ipv)
+			} else {
+				val = ([]byte)(*(v.(*net.IP)))
+			}
+			(*C.struct_ss_plugin_byte_buffer)(ptr).len = C.uint32_t(len(val))
+			(*C.struct_ss_plugin_byte_buffer)(ptr).ptr = unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&val)).Data)
+		}
+	case FieldTypeIPNet:
+		if e.IsList() {
+			if ipv, ok := v.([]net.IPNet); ok {
+				for i, ptr := range e.resizeResValPtrs(len(ipv)) {
+					val := ([]byte)((ipv)[i].IP)
+					(*C.struct_ss_plugin_byte_buffer)(ptr).len = C.uint32_t(len(val))
+					(*C.struct_ss_plugin_byte_buffer)(ptr).ptr = unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&val)).Data)
+				}
+			} else {
+				for i, ptr := range e.resizeResValPtrs(len(v.([]*net.IPNet))) {
+					val := ([]byte)(*(v.([]*net.IP))[i])
+					(*C.struct_ss_plugin_byte_buffer)(ptr).len = C.uint32_t(len(val))
+					(*C.struct_ss_plugin_byte_buffer)(ptr).ptr = unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&val)).Data)
+				}
+			}
+		} else {
+			var val []byte
+			ptr := e.resizeResValPtrs(1)[0]
+			if ipv, ok := v.(net.IPNet); ok {
+				val = ([]byte)(ipv.IP)
+			} else {
+				val = ([]byte)(v.(*net.IPNet).IP)
+			}
+			(*C.struct_ss_plugin_byte_buffer)(ptr).len = C.uint32_t(len(val))
+			(*C.struct_ss_plugin_byte_buffer)(ptr).ptr = unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&val)).Data)
+		}
 	default:
 		panic("plugin-sdk-go/sdk: called SetValue with unsupported field type")
 	}
