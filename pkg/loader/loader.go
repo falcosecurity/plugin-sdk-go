@@ -107,7 +107,14 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins"
 	"github.com/xeipuuv/gojsonschema"
+	"go.uber.org/multierr"
 )
+
+// todo(jasondellaluce,therealbobo): the loader must support the new features of
+// the plugin API:
+//   - event parsing capability
+//   - async events capability
+//   - get_extract_event_types
 
 var (
 	errNotInitialized = errors.New("plugin is not initialized")
@@ -196,26 +203,24 @@ func NewPlugin(path string) (*Plugin, error) {
 		}
 	}
 
-	// todo(jasondellaluce,therealbobo): also load parsing and async caps
-
 	// get static info related to extraction capability (if available)
 	if p.HasCapExtraction() {
-		removeCap := false
+		// capability is considered not supported if data is corrupted
 		if p.handle.api.anon1.get_extract_event_sources != nil {
 			str := C.GoString(C.__get_info_str(p.handle.api.anon1.get_extract_event_sources))
 			if err := json.Unmarshal(([]byte)(str), &p.info.ExtractEventSources); err != nil {
-				// capability is considered not supported if data is corrupted
-				removeCap = true
+				p.caps &= ^C.CAP_EXTRACTION
+				p.caps |= C.CAP_BROKEN
+				p.capBrokenErr = multierr.Append(p.capBrokenErr, errors.New("get_extract_event_sources does not return a well-formed json array"))
 			}
 		}
 		str := C.GoString(C.__get_info_str(p.handle.api.anon1.get_fields))
 		if err := json.Unmarshal(([]byte)(str), &p.fields); err != nil {
-			// capability is considered not supported if data is corrupted
-			removeCap = true
+			p.caps &= ^C.CAP_EXTRACTION
+			p.caps |= C.CAP_BROKEN
+			p.capBrokenErr = multierr.Append(p.capBrokenErr, errors.New("get_fields does not return a well-formed json array"))
 		}
-		if removeCap {
-			p.caps ^= C.CAP_EXTRACTION
-		}
+
 	}
 
 	return p, nil
@@ -244,9 +249,9 @@ func (p *Plugin) validate() error {
 			p.validErr = errors.New(C.GoString(errBuf))
 			return p.validErr
 		}
-		if p.caps == C.CAP_NONE {
+		if (p.caps & ^C.CAP_BROKEN) == C.CAP_NONE {
 			p.validErr = errors.New("plugin supports no capability")
-			return p.validErr
+			return multierr.Append(p.validErr, p.capBrokenErr)
 		}
 		p.validated = true
 	}
