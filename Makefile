@@ -14,7 +14,7 @@ SHELL := /bin/bash
 GO    ?= $(shell which go)
 CURL  ?= $(shell which curl)
 
-FALCOSECURITY_LIBS_REVISION ?= 000eb27573af74168510e4836330ff6958c3f355
+FALCOSECURITY_LIBS_REVISION ?= 118114bc456f139f7729061d7120022f832e9efb
 FALCOSECURITY_LIBS_REPO ?= falcosecurity/libs
 PLUGINLIB_URL=https://raw.githubusercontent.com/${FALCOSECURITY_LIBS_REPO}/${FALCOSECURITY_LIBS_REVISION}/userspace/plugin
 
@@ -30,13 +30,13 @@ clean: clean-pluginlib $(examples_clean)
 
 .PHONY: pluginlib
 pluginlib:
-	@$(CURL) -Lso pkg/sdk/plugin_types.h $(PLUGINLIB_URL)/plugin_types.h
-	@$(CURL) -Lso pkg/sdk/plugin_api.h $(PLUGINLIB_URL)/plugin_api.h
-	@$(CURL) -Lso pkg/loader/plugin_loader.h $(PLUGINLIB_URL)/plugin_loader.h
-	@$(CURL) -Lso pkg/loader/plugin_loader.c $(PLUGINLIB_URL)/plugin_loader.c
+	$(CURL) -Lso pkg/sdk/plugin_types.h $(PLUGINLIB_URL)/plugin_types.h
+	$(CURL) -Lso pkg/sdk/plugin_api.h $(PLUGINLIB_URL)/plugin_api.h
+	$(CURL) -Lso pkg/loader/plugin_loader.h $(PLUGINLIB_URL)/plugin_loader.h
+	$(CURL) -Lso pkg/loader/plugin_loader.c $(PLUGINLIB_URL)/plugin_loader.c
 
 clean-pluginlib:
-	@rm -f \
+	rm -f \
 		pkg/sdk/plugin_types.h \
 		pkg/sdk/plugin_api.h \
 		pkg/loader/plugin_loader.h \

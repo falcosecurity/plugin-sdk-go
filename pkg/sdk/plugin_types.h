@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022 The Falco Authors.
+Copyright (C) 2023 The Falco Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,23 +21,32 @@ limitations under the License.
 extern "C" {
 #endif
 
-#include <stdbool.h>
 #include <inttypes.h>
-#include <stddef.h>
+
+// An implementation-independent representation of boolean.
+// A 4-byte representation is equal to how bools are encoded in falcosecurity libs.
+typedef uint32_t ss_plugin_bool;
 
 // The noncontinguous numbers are to maintain equality with underlying
-// falcosecurity libs types (ppm_events_public.h).
+// falcosecurity libs types.
 typedef enum ss_plugin_field_type
 {
+	// A 64bit unsigned integer.
 	FTYPE_UINT64      = 8,
+	// A printable buffer of bytes, NULL terminated
 	FTYPE_STRING      = 9,
-	FTYPE_IPV4ADDR    = 12,
+	// A relative time. Seconds * 10^9  + nanoseconds. 64bit.
 	FTYPE_RELTIME     = 20,
+	// An absolute time interval. Seconds from epoch * 10^9  + nanoseconds. 64bit.
 	FTYPE_ABSTIME     = 21,
+	// A boolean value, 4 bytes.
 	FTYPE_BOOL        = 25,
-	FTYPE_IPV4NET     = 37,
-	FTYPE_IPV6ADDR    = 38,
-	FTYPE_IPV6NET     = 39,
+	// Either an IPv4 or IPv6 address. The length indicates which one it is.
+	FTYPE_IPADDR      = 40,
+	// Either an IPv4 or IPv6 network. The length indicates which one it is.
+	// The field encodes only the IP address, so this differs from FTYPE_IPADDR,
+	// from the way the framework perform runtime checks and comparisons.
+	FTYPE_IPNET       = 41,
 } ss_plugin_field_type;
 
 // Values to return from init() / open() / next_batch() /
@@ -65,28 +74,64 @@ typedef enum ss_plugin_schema_type
 } ss_plugin_schema_type;
 
 // This struct represents an event returned by the plugin, and is used
-// below in next_batch().
-// - evtnum: incremented for each event returned. Might not be contiguous.
-// - data: pointer to a memory buffer pointer. The plugin will set it
-//   to point to the memory containing the next event.
-// - datalen: pointer to a 32bit integer. The plugin will set it the size of the
-//   buffer pointed by data.
-// - ts: the event timestamp, in nanoseconds since the epoch.
-//   Can be (uint64_t)-1, in which case the engine will automatically
-//   fill the event time with the current time.
+// below in next_batch(). It observes the event specifics of libscap.
+// An event is represented as a contiguous region of memory composed by
+// a header and a list of parameters appended, in the form of:
 //
-// Note: event numbers are assigned by the plugin
-// framework. Therefore, there isn't any need to fill in evtnum when
-// returning an event via plugin_next_batch. It will be ignored.
-typedef struct ss_plugin_event
-{
-	uint64_t evtnum;
-	const uint8_t *data;
-	uint32_t datalen;
-	uint64_t ts;
-} ss_plugin_event;
+// | evt header | len param 1 (2B/4B) | ... | len param N (2B/4B) | data param 1 | ... | data param N |
+//
+// The event header is composed of:
+// - ts: the event timestamp, in nanoseconds since the epoch.
+//   Can be (uint64_t)-1, in which case the framework will automatically
+//   fill the event time with the current time.
+// - tid: the tid of the thread that generated this event.
+//   Can be (uint64_t)-1 in case no thread is specified, such as when generating
+//   a plugin event (type code 322).
+// - len: the event len, including the header
+// - type: the type of the event, as per the ones supported by the libscap specifics.
+//   This dictates the number and kind of parameters, and whether the lenght is
+//   encoded as a 2 bytes or 4 bytes integer.
+// - nparams: the number of parameters of the event
+#if defined _MSC_VER
+#pragma pack(push)
+#pragma pack(1)
+#elif defined __sun
+#pragma pack(1)
+#else
+#pragma pack(push, 1)
+#endif
+struct ss_plugin_event {
+#ifdef PPM_ENABLE_SENTINEL
+	uint32_t sentinel_begin;
+#endif
+	uint64_t ts; /* timestamp, in nanoseconds from epoch */
+	uint64_t tid; /* the tid of the thread that generated this event */
+	uint32_t len; /* the event len, including the header */
+	uint16_t type; /* the event type */
+	uint32_t nparams; /* the number of parameters of the event */
+};
+#if defined __sun
+#pragma pack()
+#else
+#pragma pack(pop)
+#endif
+typedef struct ss_plugin_event ss_plugin_event;
 
-typedef struct ss_plugin_byte_buffer {
+// This struct represents an event provided by the framework to the plugin
+// as a read-only input.
+// - evt: a pointer to the header of the provided event.
+// - evtnum: assigned by the framework and incremented for each event.
+//   Might not be contiguous.
+// - evtsrc: The name of the event's source. Can be "syscall" or any other
+//   event source name implemented by a plugin.
+typedef struct ss_plugin_event_input
+{
+	const ss_plugin_event* evt;
+	uint64_t evtnum;
+	const char* evtsrc;
+} ss_plugin_event_input;
+
+typedef struct ss_plugin_byte_buffer{
 	uint32_t len;
 	const void* ptr;
 } ss_plugin_byte_buffer;
@@ -136,11 +181,11 @@ typedef struct ss_plugin_extract_field
 	// changes in the plugin API. However, we must make sure that each added
 	// type is always a pointer.
 	union
-    {
+	{
 		const char** str;
 		uint64_t* u64;
 		uint32_t* u32;
-		bool* boolean;
+		ss_plugin_bool* boolean;
 		ss_plugin_byte_buffer* buf;
 	} res;
 	uint64_t res_len;
@@ -152,16 +197,79 @@ typedef struct ss_plugin_extract_field
 	const char* field;
 	const char* arg_key;
 	uint64_t arg_index;
-	bool arg_present;
+	ss_plugin_bool arg_present;
 	uint32_t ftype;
-	bool flist;
+	ss_plugin_bool flist;
 } ss_plugin_extract_field;
+
+// Types supported by entry fields of state tables.
+// The noncontinguous numbers are to maintain equality with underlying
+// falcosecurity libs types.
+// todo(jasondellaluce): should we merge this with ss_plugin_field_type?
+typedef enum ss_plugin_state_type
+{
+	SS_PLUGIN_ST_INT8 = 1,
+	SS_PLUGIN_ST_INT16 = 2,
+	SS_PLUGIN_ST_INT32 = 3,
+	SS_PLUGIN_ST_INT64 = 4,
+	SS_PLUGIN_ST_UINT8 = 5,
+	SS_PLUGIN_ST_UINT16 = 6,
+	SS_PLUGIN_ST_UINT32 = 7,
+	SS_PLUGIN_ST_UINT64 = 8,
+	SS_PLUGIN_ST_STRING = 9,
+	SS_PLUGIN_ST_BOOL = 25
+} ss_plugin_state_type;
+
+// Data representation of entry fields of state tables.
+// todo(jasondellaluce): should we merge this with what we have for field extraction?
+typedef union ss_plugin_state_data
+{
+	int8_t s8;
+	int16_t s16;
+	int32_t s32;
+	int64_t s64;
+	uint8_t u8;
+	uint16_t u16;
+	uint32_t u32;
+	uint64_t u64;
+	const char* str;
+	ss_plugin_bool b;
+} ss_plugin_state_data;
+
+// Info about a state table.
+typedef struct ss_plugin_table_info
+{
+	const char* name;
+	ss_plugin_state_type key_type;
+} ss_plugin_table_info;
+
+// Info about a data field contained in the entires of a state table.
+typedef struct ss_plugin_table_fieldinfo
+{
+	const char* name;
+	ss_plugin_state_type field_type;
+	ss_plugin_bool read_only;
+} ss_plugin_table_fieldinfo;
+
+// Opaque a pointer to a state table. The falcosecurity libs define stateful
+// components in the form of tables.
+typedef void ss_plugin_table_t;
+
+// Opaque a pointer to an entry of a state table.
+typedef void ss_plugin_table_entry_t;
+
+// Opaque accessor to a data field available in the entries of a state table.
+typedef void ss_plugin_table_field_t;
+
+// Opaque pointer to the owner of a plugin. It can be used to invert the
+// control and invoke functions of the plugin's owner from within the plugin.
+typedef void ss_plugin_owner_t;
 
 //
 // This is the opaque pointer to the state of a plugin.
 // It points to any data that might be needed plugin-wise. It is
 // allocated by init() and must be destroyed by destroy().
-// It is defined as void because the engine doesn't care what it is
+// It is defined as void because the framework doesn't care what it is
 // and it treats is as opaque.
 //
 typedef void ss_plugin_t;
@@ -171,7 +279,7 @@ typedef void ss_plugin_t;
 // plugin.
 // It points to any data that is needed while a capture is running. It is
 // allocated by open() and must be destroyed by close().
-// It is defined as void because the engine doesn't care what it is
+// It is defined as void because the framework doesn't care what it is
 // and it treats is as opaque.
 //
 typedef void ss_instance_t;
