@@ -23,14 +23,14 @@ limitations under the License.
 #include <vector>
 #include <string>
 
-#include "../../pkg/sdk/plugin_types.h"
+#include "../../pkg/sdk/plugin_api.h"
 
 // defined in Go and exported from bench.go
 extern "C"
 {
     void plugin_destroy(ss_plugin_t*);
-    ss_plugin_t* plugin_init(const char*, ss_plugin_rc*);
-    ss_plugin_rc plugin_extract_fields(ss_plugin_t*, const ss_plugin_event*, uint32_t, ss_plugin_extract_field*);
+    ss_plugin_t* plugin_init(const ss_plugin_init_input *input, ss_plugin_rc *rc);
+    ss_plugin_rc plugin_extract_fields(ss_plugin_t*, const ss_plugin_event_input*, const ss_plugin_field_extract_input*);
 }
 
 // global benchmark options
@@ -111,13 +111,16 @@ static void benchmark(ss_plugin_t *plugin) noexcept
     e.arg_present = false;
     e.ftype = FTYPE_UINT64;
     e.flist = false;
+    ss_plugin_field_extract_input in;
+    in.fields = &e;
+    in.num_fields = 1;
     
     // request multiple extractions and compute total execution time
     auto start = std::chrono::high_resolution_clock::now();
     ss_plugin_rc rc = SS_PLUGIN_FAILURE;
     for (int i = 0; i < g_niterations; i++)
     {
-        rc = plugin_extract_fields(plugin, NULL, 1, &e);
+        rc = plugin_extract_fields(plugin, NULL, &in);
         if (rc != SS_PLUGIN_SUCCESS)
         {
             fprintf(stderr, "plugin %" PRIu64 ": plugin_extract_fields failure: %d\n", (uint64_t) plugin, rc);
@@ -146,7 +149,9 @@ int main(int argc, char** argv)
     for (int i = 0; i < g_parallelism; ++i)
     {
         ss_plugin_rc rc = SS_PLUGIN_FAILURE;
-        plugins.push_back(plugin_init(g_use_async ? "async" : "", &rc));
+        ss_plugin_init_input in;
+        in.config = g_use_async ? "async" : "";
+        plugins.push_back(plugin_init(&in, &rc));
         if (rc != SS_PLUGIN_SUCCESS)
         {
             fprintf(stderr, "can't initialize plugin");
