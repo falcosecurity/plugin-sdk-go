@@ -45,9 +45,9 @@ static const char *__get_init_schema(plugin_api* p, ss_plugin_schema_type *s)
     return p->get_init_schema(s);
 }
 
-static ss_plugin_t* __init(plugin_api* p, const char *cfg, ss_plugin_rc *rc)
+static ss_plugin_t* __init(plugin_api* p, const ss_plugin_init_input *in, ss_plugin_rc *rc)
 {
-    return p->init(cfg, rc);
+    return p->init(in, rc);
 }
 
 static void __destroy(plugin_api* p, ss_plugin_t* s)
@@ -80,19 +80,19 @@ static const char* __get_progress(plugin_api* p, ss_plugin_t* s, ss_instance_t* 
     return p->get_progress(s, h, r);
 }
 
-static const char* __event_to_string(plugin_api* p, ss_plugin_t *s, const ss_plugin_event *e)
+static const char* __event_to_string(plugin_api* p, ss_plugin_t *s, const ss_plugin_event_input *e)
 {
     return p->event_to_string(s, e);
 }
 
-static ss_plugin_rc __next_batch(plugin_api* p, ss_plugin_t* s, ss_instance_t* h, uint32_t *n, ss_plugin_event **e)
+static ss_plugin_rc __next_batch(plugin_api* p, ss_plugin_t* s, ss_instance_t* h, uint32_t *n, ss_plugin_event ***e)
 {
     return p->next_batch(s, h, n, e);
 }
 
-static ss_plugin_rc __extract_fields(plugin_api* p, ss_plugin_t *s, const ss_plugin_event *e, uint32_t n, ss_plugin_extract_field *f)
+static ss_plugin_rc __extract_fields(plugin_api* p, ss_plugin_t *s, const ss_plugin_event_input *e, ss_plugin_field_extract_input *in)
 {
-    return p->extract_fields(s, e, n, f);
+    return p->extract_fields(s, e, in);
 }
 
 */
@@ -117,15 +117,16 @@ var (
 // Plugin represents a Falcosecurity Plugin loaded from an external shared
 // dynamic library
 type Plugin struct {
-	m          sync.Mutex
-	handle     *C.plugin_handle_t
-	state      *C.ss_plugin_t
-	caps       C.plugin_caps_t
-	info       plugins.Info
-	initSchema *sdk.SchemaInfo
-	fields     []sdk.FieldEntry
-	validated  bool
-	validErr   error
+	m            sync.Mutex
+	handle       *C.plugin_handle_t
+	state        *C.ss_plugin_t
+	caps         C.plugin_caps_t
+	info         plugins.Info
+	initSchema   *sdk.SchemaInfo
+	fields       []sdk.FieldEntry
+	validated    bool
+	validErr     error
+	capBrokenErr error
 }
 
 // NewValidPlugin is the same as NewPlugin(), but returns an error if
@@ -170,7 +171,10 @@ func NewPlugin(path string) (*Plugin, error) {
 	}
 
 	// get supported capabilities
-	p.caps = C.plugin_get_capabilities(p.handle)
+	p.caps = C.plugin_get_capabilities(p.handle, errBuf)
+	if p.caps&C.CAP_BROKEN != 0 {
+		p.capBrokenErr = errors.New(C.GoString(errBuf))
+	}
 
 	// read static info (if available)
 	p.info = plugins.Info{
@@ -178,9 +182,9 @@ func NewPlugin(path string) (*Plugin, error) {
 		RequiredAPIVersion:  C.GoString(C.__get_info_str(p.handle.api.get_required_api_version)),
 		Name:                C.GoString(C.__get_info_str(p.handle.api.get_name)),
 		Description:         C.GoString(C.__get_info_str(p.handle.api.get_description)),
-		EventSource:         C.GoString(C.__get_info_str(p.handle.api.anon0.get_event_source)),
 		Contact:             C.GoString(C.__get_info_str(p.handle.api.get_contact)),
 		ID:                  uint32(C.__get_info_u32(p.handle.api.anon0.get_id)),
+		EventSource:         C.GoString(C.__get_info_str(p.handle.api.anon0.get_event_source)),
 		ExtractEventSources: []string{},
 	}
 	if p.handle.api.get_init_schema != nil {
@@ -192,18 +196,24 @@ func NewPlugin(path string) (*Plugin, error) {
 		}
 	}
 
+	// todo(jasondellaluce,therealbobo): also load parsing and async caps
+
 	// get static info related to extraction capability (if available)
-	if p.HasCapExtraction() && p.handle.api.anon1.get_extract_event_sources != nil {
-		str := C.GoString(C.__get_info_str(p.handle.api.anon1.get_extract_event_sources))
-		if err := json.Unmarshal(([]byte)(str), &p.info.ExtractEventSources); err != nil {
-			// capability is considered not supported if data is corrupted
-			p.caps ^= C.CAP_EXTRACTION
-		}
-	}
 	if p.HasCapExtraction() {
+		removeCap := false
+		if p.handle.api.anon1.get_extract_event_sources != nil {
+			str := C.GoString(C.__get_info_str(p.handle.api.anon1.get_extract_event_sources))
+			if err := json.Unmarshal(([]byte)(str), &p.info.ExtractEventSources); err != nil {
+				// capability is considered not supported if data is corrupted
+				removeCap = true
+			}
+		}
 		str := C.GoString(C.__get_info_str(p.handle.api.anon1.get_fields))
 		if err := json.Unmarshal(([]byte)(str), &p.fields); err != nil {
 			// capability is considered not supported if data is corrupted
+			removeCap = true
+		}
+		if removeCap {
 			p.caps ^= C.CAP_EXTRACTION
 		}
 	}
@@ -250,6 +260,16 @@ func (p *Plugin) Validate() error {
 	p.m.Lock()
 	defer p.m.Unlock()
 	return p.validate()
+}
+
+// HasCapBroken returns true if the plugin has any of its capabilities broken.
+func (p *Plugin) HasCapBroken() bool {
+	return p.caps&C.CAP_BROKEN != 0
+}
+
+// CapBrokenError returns a non-nil error if HasCapBroken returns true.
+func (p *Plugin) CapBrokenError() error {
+	return p.capBrokenErr
 }
 
 // HasCapExtraction returns true if the plugin supports the
@@ -349,8 +369,14 @@ func (p *Plugin) Init(config string) error {
 		return fmt.Errorf("invalid plugin config: %s", err.Error())
 	}
 
+	// todo(jasondelluce,therealbobo): support owner pointer and implement table access
+	in := C.ss_plugin_init_input{}
+	in.owner = nil
+	in.get_owner_last_error = nil
+	in.tables = nil
+	in.config = C.CString(config)
 	rc := C.ss_plugin_rc(sdk.SSPluginSuccess)
-	p.state = (*C.ss_plugin_t)(C.__init(&p.handle.api, C.CString(config), (*C.ss_plugin_rc)(&rc)))
+	p.state = (*C.ss_plugin_t)(C.__init(&p.handle.api, &in, (*C.ss_plugin_rc)(&rc)))
 	if rc == C.ss_plugin_rc(sdk.SSPluginSuccess) {
 		return nil
 	}
