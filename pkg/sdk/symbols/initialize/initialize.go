@@ -38,7 +38,7 @@ limitations under the License.
 package initialize
 
 /*
-#include <stdint.h>
+#include "../../plugin_api.h"
 */
 import "C"
 import (
@@ -82,11 +82,12 @@ func SetOnInit(fn OnInitFn) {
 }
 
 //export plugin_init
-func plugin_init(config *C.char, rc *int32) C.uintptr_t {
+func plugin_init(in *C.ss_plugin_init_input, rc *int32) C.uintptr_t {
 	var state sdk.PluginState
 	var err error
 
-	state, err = onInitFn(C.GoString(config))
+	// todo(jasondellaluce,therealbobo): support table access and owner operations
+	state, err = onInitFn(C.GoString(in.config))
 	if err != nil {
 		state = &baseInit{}
 		state.(sdk.LastError).SetLastError(err)

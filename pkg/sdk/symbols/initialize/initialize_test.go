@@ -80,7 +80,16 @@ func TestInitialize(t *testing.T) {
 	SetOnInit(func(config string) (sdk.PluginState, error) {
 		return nil, nil
 	})
-	handle = cgo.Handle(plugin_init((*_Ctype_char)(cStr.CharPtr()), &res))
+
+	// create an init input
+	var in _Ctype_struct_ss_plugin_init_input
+	in.config = nil
+	in.owner = nil
+	in.get_owner_last_error = nil
+	in.tables = nil
+
+	in.config = (*_Ctype_char)(cStr.CharPtr())
+	handle = cgo.Handle(plugin_init(&in, &res))
 	if res != sdk.SSPluginSuccess {
 		t.Errorf("(res): expected %d, but found %d", sdk.SSPluginSuccess, res)
 	} else if handle.Value() != nil {
@@ -92,7 +101,8 @@ func TestInitialize(t *testing.T) {
 	SetOnInit(func(config string) (sdk.PluginState, error) {
 		return nil, errTest
 	})
-	handle = cgo.Handle(plugin_init((*_Ctype_char)(cStr.CharPtr()), &res))
+	in.config = (*_Ctype_char)(cStr.CharPtr())
+	handle = cgo.Handle(plugin_init(&in, &res))
 	if res != sdk.SSPluginFailure {
 		t.Errorf("(res): expected %d, but found %d", sdk.SSPluginFailure, res)
 	}
@@ -109,7 +119,8 @@ func TestInitialize(t *testing.T) {
 	SetOnInit(func(config string) (sdk.PluginState, error) {
 		return state, nil
 	})
-	handle = cgo.Handle(plugin_init((*_Ctype_char)(cStr.CharPtr()), &res))
+	in.config = (*_Ctype_char)(cStr.CharPtr())
+	handle = cgo.Handle(plugin_init(&in, &res))
 	if res != sdk.SSPluginSuccess {
 		t.Errorf("(res): expected %d, but found %d", sdk.SSPluginSuccess, res)
 	} else if handle.Value() != state {
