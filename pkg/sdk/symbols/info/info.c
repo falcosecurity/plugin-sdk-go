@@ -22,3 +22,12 @@ const char* get_default_required_api_version()
 {
 	return PLUGIN_API_VERSION_STR;
 }
+
+// todo(jasondellaluce,therealbobo): support this for real when we decide to
+// deal with non-plugin events in the SDK Go
+uint16_t* plugin_get_extract_event_types(uint32_t* num_types)
+{
+    static uint16_t types[] = { 322 }; // PPME_PLUGINEVENT_E
+    *num_types = sizeof(types) / sizeof(uint16_t);
+    return &types[0];
+}

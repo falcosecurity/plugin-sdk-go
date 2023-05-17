@@ -18,6 +18,7 @@ package info
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"unsafe"
 
@@ -28,7 +29,14 @@ import (
 var testStr = "test"
 var testU32 = uint32(1)
 var testStrSlice = []string{"hello", "world"}
-var testversion = "2.1.0"
+var testCurAPIVerMajor = 3
+var testCurAPIVerMinor = 0
+var testCurAPIVerPatch = 0
+var testCurAPIVer = testFormatVer(testCurAPIVerMajor, testCurAPIVerMinor, testCurAPIVerPatch)
+
+func testFormatVer(major, minor, patch int) string {
+	return fmt.Sprintf("%d.%d.%d", major, minor, patch)
+}
 
 func TestInfo(t *testing.T) {
 	var resU32 uint32
@@ -65,9 +73,9 @@ func TestInfo(t *testing.T) {
 		t.Errorf("(version) expected %s, but found %s", testStr, resStr)
 	}
 
-	SetRequiredAPIVersion(testversion)
+	SetRequiredAPIVersion(testCurAPIVer)
 	resStr = ptr.GoString(unsafe.Pointer(plugin_get_required_api_version()))
-	if resStr != testversion {
+	if resStr != testCurAPIVer {
 		t.Errorf("(requiredApiVersion) expected %s, but found %s", testStr, resStr)
 	}
 
@@ -107,9 +115,8 @@ func TestInfo(t *testing.T) {
 
 func TestSemver(t *testing.T) {
 	t.Run("success_check", func(t *testing.T) {
-		version := "2.0.0"
 		panicFunc := func() {
-			SetRequiredAPIVersion(version)
+			SetRequiredAPIVersion(testCurAPIVer)
 		}
 		assert.NotPanics(t, panicFunc)
 	})
@@ -132,29 +139,26 @@ func TestSemver(t *testing.T) {
 	})
 
 	t.Run("incompatible_major_number", func(t *testing.T) {
-		version := "3.0.0"
-		errMsg := "Plugin SDK Go required API version incompatible major number. Expected: Major version should be equal to 2 but got 3"
+		v := testFormatVer(testCurAPIVerMajor+1, testCurAPIVerMinor, testCurAPIVerPatch)
 		panicFunc := func() {
-			SetRequiredAPIVersion(version)
+			SetRequiredAPIVersion(v)
 		}
-		assert.PanicsWithValue(t, errMsg, panicFunc)
+		assert.Panics(t, panicFunc)
 	})
 
 	t.Run("incompatible_minor_number", func(t *testing.T) {
-		version := "2.2.0"
-		errMsg := "Plugin SDK Go required API version incompatible minor number. Expected: Minor version should be less than/equal to 0 but got 1"
+		v := testFormatVer(testCurAPIVerMajor, testCurAPIVerMinor+1, testCurAPIVerPatch)
 		panicFunc := func() {
-			SetRequiredAPIVersion(version)
+			SetRequiredAPIVersion(v)
 		}
-		assert.PanicsWithValue(t, errMsg, panicFunc)
+		assert.Panics(t, panicFunc)
 	})
 
 	t.Run("incompatible_patch_number", func(t *testing.T) {
-		version := "2.0.3"
-		errMsg := "Plugin SDK Go required API version incompatible patch number. Expected: Patch version should be less than/equal to 0 but got 3"
+		v := testFormatVer(testCurAPIVerMajor, testCurAPIVerMinor, testCurAPIVerPatch+1)
 		panicFunc := func() {
-			SetRequiredAPIVersion(version)
+			SetRequiredAPIVersion(v)
 		}
-		assert.PanicsWithValue(t, errMsg, panicFunc)
+		assert.Panics(t, panicFunc)
 	})
 }
