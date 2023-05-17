@@ -52,7 +52,7 @@ void async_deinit()
 
 // Defined in extract.go
 extern int32_t plugin_extract_fields_sync(ss_plugin_t *s,
-										  const ss_plugin_event *evt,
+										  const ss_plugin_event_input *evt,
 										  uint32_t num_fields,
 										  ss_plugin_extract_field *fields);
 
@@ -60,9 +60,8 @@ extern int32_t plugin_extract_fields_sync(ss_plugin_t *s,
 // non-NULL, it calls the async extractor function. Otherwise, it
 // calls the synchronous extractor function.
 FALCO_PLUGIN_SDK_PUBLIC int32_t plugin_extract_fields(ss_plugin_t *s,
-							  const ss_plugin_event *evt,
-							  uint32_t num_fields,
-							  ss_plugin_extract_field *fields)
+							  const ss_plugin_event_input *evt,
+							  const ss_plugin_field_extract_input* in)
 {
 	// note: concurrent requests are supported on the context batch, but each
 	// slot with a different value of ss_plugin_t *s. As such, for each lock
@@ -78,14 +77,14 @@ FALCO_PLUGIN_SDK_PUBLIC int32_t plugin_extract_fields(ss_plugin_t *s,
 	if (s_async_ctx_batch == NULL
 		|| atomic_load_explicit(&s_async_ctx_batch[(size_t)s - 1].lock, memory_order_seq_cst) != WAIT)
 	{
-		return plugin_extract_fields_sync(s, evt, num_fields, fields);
+		return plugin_extract_fields_sync(s, evt, in->num_fields, in->fields);
 	}
 
 	// Set input data
 	s_async_ctx_batch[(size_t)s - 1].s = s;
 	s_async_ctx_batch[(size_t)s - 1].evt = evt;
-	s_async_ctx_batch[(size_t)s - 1].num_fields = num_fields;
-	s_async_ctx_batch[(size_t)s - 1].fields = fields;
+	s_async_ctx_batch[(size_t)s - 1].num_fields = in->num_fields;
+	s_async_ctx_batch[(size_t)s - 1].fields = in->fields;
 
 	// notify data request
 	atomic_store_explicit(&s_async_ctx_batch[(size_t)s - 1].lock, DATA_REQ, memory_order_seq_cst);

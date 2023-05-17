@@ -76,15 +76,16 @@ func allocSSPluginExtractField(fid, ftype uint32, fname, farg string) (*_Ctype_s
 	}
 }
 
-func allocSSPluginEvent(num, ts uint64, data []byte) (*_Ctype_struct_ss_plugin_event, func()) {
-	ret := &_Ctype_struct_ss_plugin_event{}
+func allocSSPluginEvent(num, ts uint64, data []byte) (*_Ctype_struct_ss_plugin_event_input, func()) {
+	ret := &_Ctype_struct_ss_plugin_event_input{}
+	evts, _ := sdk.NewEventWriters(1, int64(len(data)))
+	evt := evts.Get(0)
+	evt.Writer().Write(data)
+	ret.evt = *(**_Ctype_struct_ss_plugin_event)(evts.ArrayPtr())
 	ret.evtnum = _Ctype_uint64_t(num)
-	ret.ts = _Ctype_uint64_t(ts)
-	ret.data = (*_Ctype_uint8_t)(&data[0])
-	ret.datalen = _Ctype_uint32_t(len(data))
 
 	return ret, func() {
-		// nothing to deallocate here
+		evts.Free()
 	}
 }
 
