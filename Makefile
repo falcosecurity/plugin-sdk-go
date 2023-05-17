@@ -14,7 +14,7 @@ SHELL := /bin/bash
 GO    ?= $(shell which go)
 CURL  ?= $(shell which curl)
 
-FALCOSECURITY_LIBS_REVISION ?= 118114bc456f139f7729061d7120022f832e9efb
+FALCOSECURITY_LIBS_REVISION ?= 0b9ca98fee2453a16f4538db55dcfa34bc8f5aef
 FALCOSECURITY_LIBS_REPO ?= falcosecurity/libs
 PLUGINLIB_URL=https://raw.githubusercontent.com/${FALCOSECURITY_LIBS_REPO}/${FALCOSECURITY_LIBS_REVISION}/userspace/plugin
 
