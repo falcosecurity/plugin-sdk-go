@@ -17,7 +17,7 @@ limitations under the License.
 #pragma once
 
 #include <stdatomic.h>
-#include "../../plugin_types.h"
+#include "../../plugin_api.h"
 
 typedef struct async_extractor_info
 {
@@ -26,7 +26,7 @@ typedef struct async_extractor_info
 
 	// input data
 	ss_plugin_t *s;
-	const ss_plugin_event *evt;
+	const ss_plugin_event_input *evt;
 	uint32_t num_fields;
 	ss_plugin_extract_field *fields;
 
