@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // This package exports the following C function:
-// - ss_plugin_rc plugin_next_batch(ss_plugin_t* s, ss_instance_t* h, uint32_t *nevts, ss_plugin_event **evts)
+// - ss_plugin_rc plugin_next_batch(ss_plugin_t* s, ss_instance_t* h, uint32_t *nevts, ss_plugin_event ***evts)
 //
 // The exported plugin_next_batch requires s and h to be a handles
 // of cgo.Handle from this SDK. The value of the s handle must implement
@@ -37,12 +37,12 @@ import (
 )
 
 //export plugin_next_batch
-func plugin_next_batch(pState C.uintptr_t, iState C.uintptr_t, nevts *uint32, retEvts **C.ss_plugin_event) int32 {
+func plugin_next_batch(pState C.uintptr_t, iState C.uintptr_t, nevts *uint32, retEvts ***C.ss_plugin_event) int32 {
 	events := cgo.Handle(iState).Value().(sdk.Events).Events()
 	n, err := cgo.Handle(iState).Value().(sdk.NextBatcher).NextBatch(cgo.Handle(pState).Value().(sdk.PluginState), events)
 
 	*nevts = uint32(n)
-	*retEvts = (*C.ss_plugin_event)(events.ArrayPtr())
+	*retEvts = (**C.ss_plugin_event)(events.ArrayPtr())
 	switch err {
 	case nil:
 		return sdk.SSPluginSuccess
