@@ -18,18 +18,26 @@ package sdk
 
 import (
 	"fmt"
+	"net"
 	"testing"
 	"unsafe"
 
 	"github.com/falcosecurity/plugin-sdk-go/pkg/ptr"
 )
 
+func boolToUint32(v bool) _Ctype_uint32_t {
+	if v {
+		return _Ctype_uint32_t(1)
+	}
+	return _Ctype_uint32_t(0)
+}
+
 func allocSSPluginExtractField(fid, ftype uint32, fname, farg_key string, farg_index uint64, farg_present bool, list bool) (*_Ctype_ss_plugin_extract_field, func()) {
 	ret := &_Ctype_ss_plugin_extract_field{}
 	ret.field_id = _Ctype_uint32_t(fid)
 	ret.ftype = _Ctype_uint32_t(ftype)
-	ret.arg_present = _Ctype__Bool(farg_present)
-	ret.flist = _Ctype__Bool(list)
+	ret.arg_present = boolToUint32(farg_present)
+	ret.flist = boolToUint32(list)
 	ret.arg_index = _Ctype_uint64_t(farg_index)
 
 	argKeyBuf := ptr.StringBuffer{}
@@ -71,7 +79,7 @@ func getU64ResSSPluingExtractField(t *testing.T, ptr *_Ctype_ss_plugin_extract_f
 	return (uint64)(*((*_Ctype_uint64_t)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&ptr.res))) + uintptr(index*_Ciconst_sizeof_field_result_t)))))
 }
 
-func getBinResSSPluingExtractField(t *testing.T, p *_Ctype_ss_plugin_extract_field, index int) ConstSizedBuffer {
+func getBinResSSPluingExtractField(t *testing.T, p *_Ctype_ss_plugin_extract_field, index int) []byte {
 	if p.res_len < (_Ctype_uint64_t)(index) {
 		t.Errorf("trying to access extract field res at index %d, but res len is %d", index, (int)(p.res_len))
 	}
@@ -81,14 +89,10 @@ func getBinResSSPluingExtractField(t *testing.T, p *_Ctype_ss_plugin_extract_fie
 	size := *(*uint32)(curBufPtr)
 	buf := make([]byte, size)
 	ptrBytes := *(*unsafe.Pointer)(unsafe.Pointer(uintptr(curBufPtr) + uintptr(8)))
-	for i:=0 ; i < int(size); i++{
-		buf[i] = *(*uint8)(unsafe.Pointer(uintptr(unsafe.Pointer(ptrBytes))+uintptr(i)))
+	for i := 0; i < int(size); i++ {
+		buf[i] = *(*uint8)(unsafe.Pointer(uintptr(unsafe.Pointer(ptrBytes)) + uintptr(i)))
 	}
-
-	return ConstSizedBuffer{
-		Size: size,
-		Buf:  buf,
-	}
+	return buf
 }
 
 func assertPanic(t *testing.T, fun func()) {
@@ -122,25 +126,20 @@ func TestExtractRequestSetValue(t *testing.T) {
 	testStr := "test str"
 	testU64 := uint64(99)
 	testBool := true
-	testData := []byte{ 0x41, 0x41, 0x41, 0x41, 0x42, 0x42, 0x42, 0x42, 0x43, 0x43, 0x43, 0x43, 0x44, 0x44, 0x44, 0x44, 0x45, 0x45, 0x45, 0x45, 0x46, 0x46, 0x46, 0x46, 0x47, 0x47, 0x47, 0x47, 0x48, 0x48, 0x48, 0x48, 0x49, 0x49, 0x49, 0x49, 0x4a, 0x4a, 0x4a, 0x4a, 0x4b, 0x4b, 0x4b, 0x4b, 0x4c, 0x4c, 0x4c, 0x4c, 0x4d, 0x4d, 0x4d, 0x4d, 0x4e, 0x4e, 0x4e, 0x4e, 0x4f, 0x4f, 0x4f, 0x4f, 0x50, 0x50, 0x50, 0x50, 0x51, 0x51, 0x51, 0x51, 0x52, 0x52, 0x52, 0x52, 0x53, 0x53, 0x53, 0x53, 0x54, 0x54, 0x54, 0x54, 0x55, 0x55, 0x55, 0x55, 0x56, 0x56, 0x56, 0x56, 0x57, 0x57, 0x57, 0x57, 0x58, 0x58, 0x58, 0x58, 0x59, 0x59, 0x59, 0x59, 0x5a, 0x5a, 0x5a, 0x5a, 0x5b, 0x5b, 0x5b, 0x5b, 0x5c, 0x5c, 0x5c, 0x5c, 0x5d, 0x5d, 0x5d, 0x5d, 0x5e, 0x5e, 0x5e, 0x5e, 0x5f, 0x5f, 0x5f, 0x5f, 0x60, 0x60, 0x60, 0x60, 0x61, 0x61, 0x61, 0x61, 0x62, 0x62, 0x62, 0x62, 0x63, 0x63, 0x63, 0x63, 0x64, 0x64, 0x64, 0x64, 0x65, 0x65, 0x65, 0x65, 0x66, 0x66, 0x66, 0x66, 0x67, 0x67, 0x67, 0x67, 0x68, 0x68, 0x68, 0x68, 0x69, 0x69, 0x69, 0x69, 0x6a, 0x6a, 0x6a, 0x6a, 0x6b, 0x6b, 0x6b, 0x6b, 0x6c, 0x6c, 0x6c, 0x6c, 0x6d, 0x6d, 0x6d, 0x6d, 0x6e, 0x6e, 0x6e, 0x6e, 0x6f, 0x6f, 0x6f, 0x6f, 0x70, 0x70, 0x70, 0x70, 0x71, 0x71, 0x71, 0x71, 0x72, 0x72, 0x72, 0x72, 0x73, 0x73, 0x73, 0x73, 0x74, 0x74, 0x74, 0x74, 0x75, 0x75, 0x75, 0x75, 0x76, 0x76, 0x76, 0x76, 0x77, 0x77, 0x77, 0x77, 0x78, 0x78, 0x78, 0x78, 0x79, 0x79, 0x79, 0x79, 0x7a, 0x7a, 0x7a, 0x7a, 0x7b, 0x7b, 0x7b, 0x7b, 0x7c, 0x7c, 0x7c, 0x7c, 0x7d, 0x7d, 0x7d, 0x7d, 0x7e, 0x7e, 0x7e, 0x7e, 0x7f, 0x7f, 0x7f, 0x7f, 0x80, 0x80 }
-	testIPv6 := ConstSizedBuffer{
-		Size: uint32(len(testData)),
-		Buf: testData,
-	}
+	testIPv6 := net.IPv6loopback
 	testStrList := make([]string, 0)
 	testU64List := make([]uint64, 0)
 	testBoolList := make([]bool, 0)
-	dataArray := make([]byte, (minResultBufferLen+1)*int(testIPv6.Size))
-	for i := 0; i < (minResultBufferLen+1)*int(testIPv6.Size); i++ {
+	dataArray := make([]byte, (minResultBufferLen+1)*int(len(testIPv6)))
+	for i := 0; i < (minResultBufferLen+1)*int(len(testIPv6)); i++ {
 		dataArray[i] = byte(i)
 	}
-	testIPv6List := make([]ConstSizedBuffer, minResultBufferLen+1)
+	testIPv6List := make([]net.IP, minResultBufferLen+1)
 	for i := 0; i < minResultBufferLen+1; i++ {
 		testStrList = append(testStrList, fmt.Sprintf("test-%d", i))
 		testU64List = append(testU64List, uint64(i))
-		testBoolList = append(testBoolList, i%3==0)
-		testIPv6List[i].Buf = dataArray[i*int(testIPv6.Size) : (i+1)*int(testIPv6.Size)]
-		testIPv6List[i].Size = testIPv6.Size
+		testBoolList = append(testBoolList, i%3 == 0)
+		testIPv6List[i] = dataArray[i*len(testIPv6) : (i+1)*len(testIPv6)]
 	}
 
 	// init extract requests
@@ -151,8 +150,8 @@ func TestExtractRequestSetValue(t *testing.T) {
 	strListPtr, freeStrListPtr := allocSSPluginExtractField(4, FieldTypeCharBuf, "test.str", "", 0, true, true)
 	boolPtr, freeBoolPtr := allocSSPluginExtractField(5, FieldTypeBool, "test.bool", "", 0, true, false)
 	boolListPtr, freeBoolListPtr := allocSSPluginExtractField(6, FieldTypeBool, "test.bool", "", 0, true, true)
-	binPtr, freeBinPtr := allocSSPluginExtractField(7, FieldTypeIPv6Addr, "test.ipv6addr", "", 0, true, false)
-	binListPtr, freeBinListPtr := allocSSPluginExtractField(8, FieldTypeIPv6Addr, "test.ipv6addr", "", 0, true, true)
+	binPtr, freeBinPtr := allocSSPluginExtractField(7, FieldTypeIPAddr, "test.ipv6addr", "", 0, true, false)
+	binListPtr, freeBinListPtr := allocSSPluginExtractField(8, FieldTypeIPAddr, "test.ipv6addr", "", 0, true, true)
 	u64Req := pool.Get(0)
 	u64ReqList := pool.Get(1)
 	strReq := pool.Get(2)
@@ -200,17 +199,17 @@ func TestExtractRequestSetValue(t *testing.T) {
 	assertPanic(t, func() {
 		u64Req.SetValue("test")
 		u64Req.SetValue(bool(true))
-		boolReq.SetValue([]byte{ 0x41, 0x41, 0x41, 0x41})
+		boolReq.SetValue([]byte{0x41, 0x41, 0x41, 0x41})
 	})
 	assertPanic(t, func() {
 		strReq.SetValue(uint64(1))
 		strReq.SetValue(bool(true))
-		boolReq.SetValue([]byte{ 0x41, 0x41, 0x41, 0x41})
+		boolReq.SetValue([]byte{0x41, 0x41, 0x41, 0x41})
 	})
 	assertPanic(t, func() {
 		boolReq.SetValue(uint64(1))
 		boolReq.SetValue("test")
-		boolReq.SetValue([]byte{ 0x41, 0x41, 0x41, 0x41})
+		boolReq.SetValue([]byte{0x41, 0x41, 0x41, 0x41})
 	})
 	assertPanic(t, func() {
 		binReq.SetValue(uint64(1))
@@ -246,16 +245,16 @@ func TestExtractRequestSetValue(t *testing.T) {
 	boolReqList.SetValue(testBoolList)
 	for i, b := range testBoolList {
 		if getBoolResSSPluingExtractField(t, boolListPtr, i) != b {
-			t.Errorf("expected value '%v', but found '%v' at index %d", b, getBoolResSSPluingExtractField(t, boolPtr, i),i)
+			t.Errorf("expected value '%v', but found '%v' at index %d", b, getBoolResSSPluingExtractField(t, boolPtr, i), i)
 		}
 	}
 	binReq.SetValue(testIPv6)
 	testIPv6res := getBinResSSPluingExtractField(t, binPtr, 0)
-	if testIPv6res.Size != testIPv6.Size {
+	if len(testIPv6res) != len(testIPv6) {
 		t.Errorf("expected value '%v', but found '%v'", testIPv6, getBinResSSPluingExtractField(t, binPtr, 0))
 	} else {
-		for i:=0 ; uint32(i)<testIPv6.Size ; i++ {
-			if testIPv6.Buf[i] != testIPv6res.Buf[i] {
+		for i := 0; i < len(testIPv6); i++ {
+			if testIPv6[i] != testIPv6res[i] {
 				t.Errorf("expected value '%v', but found '%v'", testIPv6, getBinResSSPluingExtractField(t, binPtr, 0))
 			}
 		}
@@ -263,12 +262,12 @@ func TestExtractRequestSetValue(t *testing.T) {
 	binReqList.SetValue(testIPv6List)
 	for i, s := range testIPv6List {
 		testIPv6res := getBinResSSPluingExtractField(t, binListPtr, i)
-		if testIPv6res.Size != s.Size {
-			t.Errorf("expected size '%v', but found '%v'", s.Size, testIPv6res.Size)
+		if len(testIPv6res) != len(s) {
+			t.Errorf("expected size '%v', but found '%v'", len(s), len(testIPv6res))
 		} else {
-			for k:=0 ; uint32(k)<s.Size ; k++ {
-				if s.Buf[k] != testIPv6res.Buf[k] {
-					t.Errorf("expected value '%v', but found '%v'", s.Buf, testIPv6res.Buf)
+			for k := 0; k < len(s); k++ {
+				if s[k] != testIPv6res[k] {
+					t.Errorf("expected value '%v', but found '%v'", s, testIPv6res)
 				}
 			}
 		}

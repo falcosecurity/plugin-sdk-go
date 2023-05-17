@@ -1,5 +1,5 @@
 /*
-   
+
 Copyright (C) 2021 The Falco Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,16 +51,20 @@ const DefaultBatchSize uint32 = 128
 // The full set of values that can be returned in the ftype
 // member of ss_plugin_extract_field structs (ppm_events_public.h).
 const (
-	FieldTypeUint64   uint32 = 8
-	FieldTypeCharBuf  uint32 = 9 // A printable buffer of bytes, NULL terminated
-	FieldTypeRelTime  uint32 = 20
-	FieldTypeAbsTime  uint32 = 21
-	FieldTypeBool     uint32 = 25
-	FieldTypeIPv4Addr uint32 = 26
-	FieldTypeIPv4Net  uint32 = 37
-	FieldTypeIPv6Addr uint32 = 38
-	FieldTypeIPv6Net  uint32 = 39
-
+	// A 64bit unsigned integer.
+	FieldTypeUint64 uint32 = 8
+	// A printable buffer of bytes, NULL terminated.
+	FieldTypeCharBuf uint32 = 9
+	// A relative time. Seconds * 10^9  + nanoseconds. 64bit.
+	FieldTypeRelTime uint32 = 20
+	// An absolute time interval. Seconds from epoch * 10^9  + nanoseconds. 64bit.
+	FieldTypeAbsTime uint32 = 21
+	// A boolean value, 4 bytes.
+	FieldTypeBool uint32 = 25
+	// Either an IPv4 or IPv6 address. The length indicates which one it is.
+	FieldTypeIPAddr uint32 = 40
+	// Either an IPv4 or IPv6 network. The length indicates which one it is.
+	FieldTypeIPNet uint32 = 41
 )
 
 // FieldEntry represents a single field entry that a plugin with field extraction
