@@ -28,6 +28,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/alecthomas/jsonschema"
@@ -54,7 +55,8 @@ type MyPluginConfig struct {
 // State variables to store in the plugin must be defined here.
 type MyPlugin struct {
 	plugins.BasePlugin
-	config MyPluginConfig
+	config   MyPluginConfig
+	initTime time.Time
 }
 
 // Defining a type for the plugin source capture instances returned by Open().
@@ -127,6 +129,7 @@ func (m *MyPlugin) InitSchema() *sdk.SchemaInfo {
 // always well-formed according to the provided schema.
 // This method is mandatory.
 func (m *MyPlugin) Init(config string) error {
+	m.initTime = time.Now()
 	// Deserialize the config json. Ignoring the error
 	// and not validating the config values is possible
 	// due to the schema defined through InitSchema(),
@@ -143,6 +146,13 @@ func (m *MyPlugin) Fields() []sdk.FieldEntry {
 	return []sdk.FieldEntry{
 		{Type: "uint64", Name: "example.count", Display: "Counter value", Desc: "Current value of the internal counter"},
 		{Type: "string", Name: "example.countstr", Display: "Counter string value", Desc: "String represetation of current value of the internal counter"},
+		{Type: "bool", Name: "example.oddcount", Display: "Counter value is odd", Desc: "True if the current value of the internal counter is an odd number"},
+		{Type: "reltime", Name: "example.initduration", Display: "Time since init", Desc: "Time since the plugin was initialized"},
+		{Type: "abstime", Name: "example.evttime", Display: "Event timestamp", Desc: "Event timestamp"},
+		{Type: "ipaddr", Name: "example.ipv4addr", Display: "Sample IPv4 address", Desc: "A sample IPv4 address"},
+		{Type: "ipaddr", Name: "example.ipv6addr", Display: "Sample IPv6 address", Desc: "A sample IPv6 address"},
+		{Type: "ipnet", Name: "example.ipv4net", Display: "Sample IPv4 network", Desc: "A sample IPv4 network"},
+		{Type: "ipnet", Name: "example.ipv6net", Display: "Sample IPv6 network", Desc: "A sample IPv6 network"},
 	}
 }
 
@@ -156,12 +166,43 @@ func (m *MyPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error {
 		return err
 	}
 
-	switch req.FieldID() {
-	case 0:
+	switch req.Field() {
+	case "example.count":
 		req.SetValue(value)
 		return nil
-	case 1:
+	case "example.countstr":
 		req.SetValue(fmt.Sprintf("%d", value))
+		return nil
+	case "example.oddcount":
+		req.SetValue((value%2 == 1))
+		return nil
+	case "example.initduration":
+		req.SetValue(time.Since(m.initTime))
+		return nil
+	case "example.evttime":
+		req.SetValue(time.Unix(0, int64(evt.Timestamp())))
+		return nil
+	case "example.ipv4addr":
+		req.SetValue(net.IPv4allsys.To4())
+		return nil
+	case "example.ipv6addr":
+		req.SetValue(net.IPv6loopback)
+		return nil
+	case "example.ipv4net":
+		_, n, err := net.ParseCIDR("192.0.2.1/24")
+		if err == nil {
+			req.SetValue(n)
+		} else {
+			println(err.Error())
+		}
+		return nil
+	case "example.ipv6net":
+		_, n, err := net.ParseCIDR("2002::1234:abcd:ffff:c0a8:101/64")
+		if err == nil {
+			req.SetValue(n)
+		} else {
+			println(err.Error())
+		}
 		return nil
 	default:
 		return fmt.Errorf("unsupported field: %s", req.Field())
