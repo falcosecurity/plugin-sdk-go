@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022 The Falco Authors.
+Copyright (C) 2023 The Falco Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,17 +22,33 @@ limitations under the License.
     #include <dlfcn.h>
     typedef void* library_handle_t;
 #endif
+
+#include "strlcpy.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "plugin_loader.h"
 
-static inline void add_str_prefix(char* s, const char* prefix)
+static inline void err_prepend(char* s, const char* prefix, const char* sep)
 {
     char tmp[PLUGIN_MAX_ERRLEN];
-    strncpy(tmp, prefix, PLUGIN_MAX_ERRLEN - 1);
-    strncat(tmp, s, PLUGIN_MAX_ERRLEN - 1);
-    strcpy(s, tmp);
+    size_t prefix_len = strlcpy(tmp, prefix, PLUGIN_MAX_ERRLEN);
+    if (*s != '\0')
+    {
+        strlcpy(&tmp[prefix_len], sep, PLUGIN_MAX_ERRLEN - prefix_len);
+        prefix_len += strlen(sep);
+    }
+    strlcpy(&tmp[prefix_len], s, PLUGIN_MAX_ERRLEN - prefix_len);
+    strlcpy(s, tmp, PLUGIN_MAX_ERRLEN);
+}
+
+static inline void err_append(char* s, const char* suffix, const char* sep)
+{
+    if (*s != '\0')
+    {
+        strncat(s, sep, PLUGIN_MAX_ERRLEN - strlen(sep));
+    }
+    strncat(s, suffix, PLUGIN_MAX_ERRLEN - strlen(suffix));
 }
 
 static void* getsym(library_handle_t handle, const char* name)
@@ -51,8 +67,13 @@ static void* getsym(library_handle_t handle, const char* name)
 plugin_handle_t* plugin_load(const char* path, char* err)
 {
     // alloc and init memory
-    strcpy(err, "");
+    err[0] = '\0';
     plugin_handle_t* ret = (plugin_handle_t*) calloc (1, sizeof(plugin_handle_t));
+    if (!ret)
+    {
+        strlcpy(err, "error allocating plugin handle", PLUGIN_MAX_ERRLEN);
+        return NULL;
+    }
 
     // open dynamic library
 #ifdef _WIN32
@@ -65,7 +86,7 @@ plugin_handle_t* plugin_load(const char* path, char* err)
         LPTSTR msg_buf = 0;
         if (FormatMessageA(flg, 0, GetLastError(), 0, (LPTSTR) &msg_buf, 0, NULL) && msg_buf)
         {
-            strncpy(err, msg_buf, PLUGIN_MAX_ERRLEN -1 );
+            strlcpy(err, msg_buf, PLUGIN_MAX_ERRLEN);
             LocalFree(msg_buf);
         }
     }
@@ -73,14 +94,14 @@ plugin_handle_t* plugin_load(const char* path, char* err)
     ret->handle = dlopen(path, RTLD_LAZY);
     if (ret->handle == NULL)
     {
-        strncpy(err, (const char*) dlerror(), PLUGIN_MAX_ERRLEN - 1);
+        strlcpy(err, (const char*) dlerror(), PLUGIN_MAX_ERRLEN);
     }
 #endif
 
     // return NULL if library loading had errors
     if (ret->handle == NULL)
     {
-        add_str_prefix(err, "can't load plugin dynamic library: ");
+        err_prepend(err, "can't load plugin dynamic library:", " ");
         free(ret);
         return NULL;
     }
@@ -106,6 +127,33 @@ plugin_handle_t* plugin_load(const char* path, char* err)
     SYM_RESOLVE(ret, get_fields);
     SYM_RESOLVE(ret, extract_fields);
     SYM_RESOLVE(ret, get_extract_event_sources);
+    SYM_RESOLVE(ret, get_extract_event_types);
+    SYM_RESOLVE(ret, get_parse_event_types);
+    SYM_RESOLVE(ret, get_parse_event_sources);
+    SYM_RESOLVE(ret, parse_event);
+    SYM_RESOLVE(ret, get_async_event_sources);
+    SYM_RESOLVE(ret, get_async_events);
+    SYM_RESOLVE(ret, set_async_event_handler);
+    return ret;
+}
+
+plugin_handle_t* plugin_load_api(const plugin_api* api, char* err)
+{
+    // alloc and init memory
+    err[0] = '\0';
+    if (!api)
+    {
+        strlcpy(err, "can't allocate plugin handle with invalid API table", PLUGIN_MAX_ERRLEN);
+        return NULL;
+    }
+
+    plugin_handle_t* ret = (plugin_handle_t*) calloc (1, sizeof(plugin_handle_t));
+    if (!ret)
+    {
+        strlcpy(err, "error allocating plugin handle", PLUGIN_MAX_ERRLEN);
+        return NULL;
+    }
+    ret->api = *api;
     return ret;
 }
 
@@ -155,7 +203,7 @@ bool plugin_check_required_api_version(const plugin_handle_t* h, char* err)
     const char *ver, *failmsg;
     if (h->api.get_required_api_version == NULL)
     {
-        strncpy(err, "plugin_get_required_api_version symbol not implemented", PLUGIN_MAX_ERRLEN - 1);
+        strlcpy(err, "plugin_get_required_api_version symbol not implemented", PLUGIN_MAX_ERRLEN);
         return false;
     }
 
@@ -191,23 +239,56 @@ bool plugin_check_required_api_version(const plugin_handle_t* h, char* err)
     return true;
 }
 
-plugin_caps_t plugin_get_capabilities(const plugin_handle_t* h)
+
+plugin_caps_t plugin_get_capabilities(const plugin_handle_t* h, char* err)
 {
     plugin_caps_t caps = CAP_NONE;
+    strlcpy(err, "", PLUGIN_MAX_ERRLEN);
 
-    if (h->api.get_id != NULL
-        && h->api.get_event_source != NULL
-        && h->api.open != NULL
-        && h->api.close != NULL
-        && h->api.next_batch != NULL)
+    if (h->api.open != NULL && h->api.close != NULL && h->api.next_batch != NULL)
     {
-        caps = (plugin_caps_t)((uint32_t) caps | (uint32_t) CAP_SOURCING);
+        bool has_id = h->api.get_id != NULL && h->api.get_id() != 0;
+        bool has_source = h->api.get_event_source != NULL && strlen(h->api.get_event_source()) > 0;
+        if ((has_id && has_source) || (!has_id && !has_source))
+        {
+            caps = (plugin_caps_t)((uint32_t) caps | (uint32_t) CAP_SOURCING);
+        }
+        else
+        {
+            caps = (plugin_caps_t)((uint32_t) caps | (uint32_t) CAP_BROKEN);
+            err_append(err, "must implement both 'plugin_get_id' and 'plugin_get_event_source' or neither (event sourcing)", ", ");
+        }
+    }
+    else if (h->api.open != NULL || h->api.close != NULL || h->api.next_batch != NULL
+            || h->api.get_id != NULL || h->api.get_event_source != NULL)
+    {
+        caps = (plugin_caps_t)((uint32_t) caps | (uint32_t) CAP_BROKEN);
+        err_append(err, "must implement all of 'plugin_open', 'plugin_close', and 'plugin_next_batch' (event sourcing)", ", ");
     }
 
-    if (h->api.get_fields != NULL
-        && h->api.extract_fields != NULL)
+    if (h->api.get_fields != NULL && h->api.extract_fields != NULL)
     {
         caps = (plugin_caps_t)((uint32_t) caps | (uint32_t) CAP_EXTRACTION);
+    }
+    else if (h->api.get_fields != NULL || h->api.extract_fields != NULL)
+    {
+        caps = (plugin_caps_t)((uint32_t) caps | (uint32_t) CAP_BROKEN);
+        err_append(err, "must implement both 'plugin_get_fields' and 'plugin_extract_fields' (field extraction)", ", ");
+    }
+
+    if (h->api.parse_event != NULL)
+    {
+        caps = (plugin_caps_t)((uint32_t) caps | (uint32_t) CAP_PARSING);
+    }
+
+    if (h->api.get_async_events != NULL && h->api.set_async_event_handler != NULL)
+    {
+        caps = (plugin_caps_t)((uint32_t) caps | (uint32_t) CAP_ASYNC);
+    }
+    else if (h->api.get_async_events != NULL || h->api.set_async_event_handler != NULL)
+    {
+        caps = (plugin_caps_t)((uint32_t) caps | (uint32_t) CAP_BROKEN);
+        err_append(err, "must implement both 'plugin_get_async_events' and 'plugin_set_async_event_handler' (async events)", ", ");
     }
 
     return caps;
@@ -218,7 +299,7 @@ plugin_caps_t plugin_get_capabilities(const plugin_handle_t* h)
     do { \
         if(a->api.s == NULL) \
         { \
-            snprintf(e, PLUGIN_MAX_ERRLEN, "symbol not implemented: %s", #s); \
+            snprintf(e, PLUGIN_MAX_ERRLEN, "required symbol not implemented: '%s'", #s); \
             return false; \
         } \
     } while(0)
