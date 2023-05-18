@@ -61,22 +61,22 @@ func getBoolResSSPluingExtractField(t *testing.T, ptr *_Ctype_ss_plugin_extract_
 	if ptr.res_len < (_Ctype_uint64_t)(index) {
 		t.Errorf("trying to access extract field res at index %d, but res len is %d", index, (int)(ptr.res_len))
 	}
-	value := (uint8)(*((*_Ctype_uint32_t)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&ptr.res))) + uintptr(index*_Ciconst_sizeof_field_result_t)))))
-	return value != uint8(0)
+	value := (uint32)(*((*_Ctype_uint32_t)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&ptr.res))) + uintptr(index*_Ciconst_sizeof_uint32_t)))))
+	return value != uint32(0)
 }
 
 func getStrResSSPluingExtractField(t *testing.T, p *_Ctype_ss_plugin_extract_field, index int) string {
 	if p.res_len < (_Ctype_uint64_t)(index) {
 		t.Errorf("trying to access extract field res at index %d, but res len is %d", index, (int)(p.res_len))
 	}
-	return ptr.GoString(unsafe.Pointer((*((**_Ctype_char)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&p.res))) + uintptr(index*_Ciconst_sizeof_field_result_t)))))))
+	return ptr.GoString(unsafe.Pointer((*((**_Ctype_char)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&p.res))) + uintptr(index*_Ciconst_sizeof_uintptr_t)))))))
 }
 
 func getU64ResSSPluingExtractField(t *testing.T, ptr *_Ctype_ss_plugin_extract_field, index int) uint64 {
 	if ptr.res_len < (_Ctype_uint64_t)(index) {
 		t.Errorf("trying to access extract field res at index %d, but res len is %d", index, (int)(ptr.res_len))
 	}
-	return (uint64)(*((*_Ctype_uint64_t)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&ptr.res))) + uintptr(index*_Ciconst_sizeof_field_result_t)))))
+	return (uint64)(*((*_Ctype_uint64_t)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&ptr.res))) + uintptr(index*_Ciconst_sizeof_uint64_t)))))
 }
 
 func getBinResSSPluingExtractField(t *testing.T, p *_Ctype_ss_plugin_extract_field, index int) []byte {
