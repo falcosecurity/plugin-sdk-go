@@ -216,16 +216,17 @@ func (e *extractRequest) boolToU32(v bool) uint32 {
 	return uint32(0)
 }
 
-func (e *extractRequest) resizeResValPtrs(length int) []unsafe.Pointer {
+func (e *extractRequest) resizeResValPtrs(length, dataSize int) []unsafe.Pointer {
 	if e.resBufLen < uint32(length) {
 		C.free(unsafe.Pointer(e.resBuf))
 		e.resBufLen = uint32(length)
 		e.resBuf = (*C.field_result_t)(C.malloc((C.size_t)(e.resBufLen * C.sizeof_field_result_t)))
 		e.resValPtrs = make([]unsafe.Pointer, length)
-		for i := 0; i < length; i++ {
-			ptr := (*C.field_result_t)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*C.sizeof_field_result_t)))
-			e.resValPtrs[i] = unsafe.Pointer(ptr)
-		}
+	}
+	// we need to recompute the pointers everytime, because
+	// the same extractRequest can be reused with different dataSizes.
+	for i := 0; i < length; i++ {
+		e.resValPtrs[i] = unsafe.Pointer(uintptr(unsafe.Pointer(e.resBuf)) + uintptr(i*dataSize))
 	}
 	e.req.res_len = (C.uint64_t)(length)
 	return e.resValPtrs[:length]
@@ -235,25 +236,25 @@ func (e *extractRequest) SetValue(v interface{}) {
 	switch e.FieldType() {
 	case FieldTypeBool:
 		if e.IsList() {
-			for i, ptr := range e.resizeResValPtrs(len(v.([]bool))) {
-				*((*C.uint64_t)(ptr)) = (C.uint64_t)(e.boolToU32((v.([]bool))[i]))
+			for i, ptr := range e.resizeResValPtrs(len(v.([]bool)), C.sizeof_uint32_t) {
+				*((*C.uint32_t)(ptr)) = (C.uint32_t)(e.boolToU32((v.([]bool))[i]))
 			}
 		} else {
-			ptr := e.resizeResValPtrs(1)[0]
-			*((*C.uint64_t)(ptr)) = (C.uint64_t)(e.boolToU32(v.(bool)))
+			ptr := e.resizeResValPtrs(1, C.sizeof_uint32_t)[0]
+			*((*C.uint32_t)(ptr)) = (C.uint32_t)(e.boolToU32(v.(bool)))
 		}
 	case FieldTypeUint64:
 		if e.IsList() {
-			for i, ptr := range e.resizeResValPtrs(len(v.([]uint64))) {
+			for i, ptr := range e.resizeResValPtrs(len(v.([]uint64)), C.sizeof_uint64_t) {
 				*((*C.uint64_t)(ptr)) = (C.uint64_t)((v.([]uint64))[i])
 			}
 		} else {
-			ptr := e.resizeResValPtrs(1)[0]
+			ptr := e.resizeResValPtrs(1, C.sizeof_uint64_t)[0]
 			*((*C.uint64_t)(ptr)) = (C.uint64_t)(v.(uint64))
 		}
 	case FieldTypeCharBuf:
 		if e.IsList() {
-			for i, out := range e.resizeResValPtrs(len(v.([]string))) {
+			for i, out := range e.resizeResValPtrs(len(v.([]string)), C.sizeof_uintptr_t) {
 				if len(e.resStrBufs) <= i {
 					e.resStrBufs = append(e.resStrBufs, &ptr.StringBuffer{})
 				}
@@ -261,23 +262,23 @@ func (e *extractRequest) SetValue(v interface{}) {
 				*((**C.char)(out)) = (*C.char)(e.resStrBufs[i].CharPtr())
 			}
 		} else {
-			out := e.resizeResValPtrs(1)[0]
+			out := e.resizeResValPtrs(1, C.sizeof_uintptr_t)[0]
 			e.resStrBufs[0].Write(v.(string))
 			*((**C.char)(out)) = (*C.char)(e.resStrBufs[0].CharPtr())
 		}
 	case FieldTypeRelTime:
 		if e.IsList() {
 			if val, ok := v.([]time.Duration); ok {
-				for i, ptr := range e.resizeResValPtrs(len(val)) {
+				for i, ptr := range e.resizeResValPtrs(len(val), C.sizeof_uint64_t) {
 					*((*C.uint64_t)(ptr)) = (C.uint64_t)(val[i].Nanoseconds())
 				}
 			} else {
-				for i, ptr := range e.resizeResValPtrs(len(v.([]*time.Duration))) {
+				for i, ptr := range e.resizeResValPtrs(len(v.([]*time.Duration)), C.sizeof_uint64_t) {
 					*((*C.uint64_t)(ptr)) = (C.uint64_t)(v.([]*time.Duration)[i].Nanoseconds())
 				}
 			}
 		} else {
-			ptr := e.resizeResValPtrs(1)[0]
+			ptr := e.resizeResValPtrs(1, C.sizeof_uint64_t)[0]
 			if val, ok := v.(time.Duration); ok {
 				*((*C.uint64_t)(ptr)) = (C.uint64_t)(val.Nanoseconds())
 			} else {
@@ -287,16 +288,16 @@ func (e *extractRequest) SetValue(v interface{}) {
 	case FieldTypeAbsTime:
 		if e.IsList() {
 			if val, ok := v.([]time.Time); ok {
-				for i, ptr := range e.resizeResValPtrs(len(val)) {
+				for i, ptr := range e.resizeResValPtrs(len(val), C.sizeof_uint64_t) {
 					*((*C.uint64_t)(ptr)) = (C.uint64_t)(val[i].UnixNano())
 				}
 			} else {
-				for i, ptr := range e.resizeResValPtrs(len(v.([]*time.Time))) {
+				for i, ptr := range e.resizeResValPtrs(len(v.([]*time.Time)), C.sizeof_uint64_t) {
 					*((*C.uint64_t)(ptr)) = (C.uint64_t)(v.([]*time.Time)[i].UnixNano())
 				}
 			}
 		} else {
-			ptr := e.resizeResValPtrs(1)[0]
+			ptr := e.resizeResValPtrs(1, C.sizeof_uint64_t)[0]
 			if val, ok := v.(time.Time); ok {
 				*((*C.uint64_t)(ptr)) = (C.uint64_t)(val.UnixNano())
 			} else {
@@ -306,13 +307,13 @@ func (e *extractRequest) SetValue(v interface{}) {
 	case FieldTypeIPAddr:
 		if e.IsList() {
 			if val, ok := v.([]net.IP); ok {
-				for i, ptr := range e.resizeResValPtrs(len(val)) {
+				for i, ptr := range e.resizeResValPtrs(len(val), C.sizeof_struct_ss_plugin_byte_buffer) {
 					val := ([]byte)((val)[i])
 					(*C.struct_ss_plugin_byte_buffer)(ptr).len = C.uint32_t(len(val))
 					(*C.struct_ss_plugin_byte_buffer)(ptr).ptr = unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&val)).Data)
 				}
 			} else {
-				for i, ptr := range e.resizeResValPtrs(len(v.([]*net.IP))) {
+				for i, ptr := range e.resizeResValPtrs(len(v.([]*net.IP)), C.sizeof_struct_ss_plugin_byte_buffer) {
 					val := ([]byte)(*(v.([]*net.IP))[i])
 					(*C.struct_ss_plugin_byte_buffer)(ptr).len = C.uint32_t(len(val))
 					(*C.struct_ss_plugin_byte_buffer)(ptr).ptr = unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&val)).Data)
@@ -320,7 +321,7 @@ func (e *extractRequest) SetValue(v interface{}) {
 			}
 		} else {
 			var val []byte
-			ptr := e.resizeResValPtrs(1)[0]
+			ptr := e.resizeResValPtrs(1, C.sizeof_struct_ss_plugin_byte_buffer)[0]
 			if ipv, ok := v.(net.IP); ok {
 				val = ([]byte)(ipv)
 			} else {
@@ -332,21 +333,21 @@ func (e *extractRequest) SetValue(v interface{}) {
 	case FieldTypeIPNet:
 		if e.IsList() {
 			if ipv, ok := v.([]net.IPNet); ok {
-				for i, ptr := range e.resizeResValPtrs(len(ipv)) {
+				for i, ptr := range e.resizeResValPtrs(len(ipv), C.sizeof_struct_ss_plugin_byte_buffer) {
 					val := ([]byte)((ipv)[i].IP)
 					(*C.struct_ss_plugin_byte_buffer)(ptr).len = C.uint32_t(len(val))
 					(*C.struct_ss_plugin_byte_buffer)(ptr).ptr = unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&val)).Data)
 				}
 			} else {
-				for i, ptr := range e.resizeResValPtrs(len(v.([]*net.IPNet))) {
-					val := ([]byte)(*(v.([]*net.IP))[i])
+				for i, ptr := range e.resizeResValPtrs(len(v.([]*net.IPNet)), C.sizeof_struct_ss_plugin_byte_buffer) {
+					val := ([]byte)((v.([]*net.IPNet))[i].IP)
 					(*C.struct_ss_plugin_byte_buffer)(ptr).len = C.uint32_t(len(val))
 					(*C.struct_ss_plugin_byte_buffer)(ptr).ptr = unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&val)).Data)
 				}
 			}
 		} else {
 			var val []byte
-			ptr := e.resizeResValPtrs(1)[0]
+			ptr := e.resizeResValPtrs(1, C.sizeof_struct_ss_plugin_byte_buffer)[0]
 			if ipv, ok := v.(net.IPNet); ok {
 				val = ([]byte)(ipv.IP)
 			} else {
