@@ -107,7 +107,6 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins"
 	"github.com/xeipuuv/gojsonschema"
-	"go.uber.org/multierr"
 )
 
 // todo(jasondellaluce,therealbobo): the loader must support the new features of
@@ -134,6 +133,16 @@ type Plugin struct {
 	validated    bool
 	validErr     error
 	capBrokenErr error
+}
+
+func errAppend(left, right error) error {
+	if left == nil {
+		return right
+	}
+	if right == nil {
+		return left
+	}
+	return fmt.Errorf("%s, %s", left.Error(), right.Error())
 }
 
 // NewValidPlugin is the same as NewPlugin(), but returns an error if
@@ -211,14 +220,14 @@ func NewPlugin(path string) (*Plugin, error) {
 			if err := json.Unmarshal(([]byte)(str), &p.info.ExtractEventSources); err != nil {
 				p.caps &= ^C.CAP_EXTRACTION
 				p.caps |= C.CAP_BROKEN
-				p.capBrokenErr = multierr.Append(p.capBrokenErr, errors.New("get_extract_event_sources does not return a well-formed json array"))
+				p.capBrokenErr = errAppend(p.capBrokenErr, errors.New("get_extract_event_sources does not return a well-formed json array"))
 			}
 		}
 		str := C.GoString(C.__get_info_str(p.handle.api.anon1.get_fields))
 		if err := json.Unmarshal(([]byte)(str), &p.fields); err != nil {
 			p.caps &= ^C.CAP_EXTRACTION
 			p.caps |= C.CAP_BROKEN
-			p.capBrokenErr = multierr.Append(p.capBrokenErr, errors.New("get_fields does not return a well-formed json array"))
+			p.capBrokenErr = errAppend(p.capBrokenErr, errors.New("get_fields does not return a well-formed json array"))
 		}
 
 	}
@@ -251,7 +260,7 @@ func (p *Plugin) validate() error {
 		}
 		if (p.caps & ^C.CAP_BROKEN) == C.CAP_NONE {
 			p.validErr = errors.New("plugin supports no capability")
-			return multierr.Append(p.validErr, p.capBrokenErr)
+			return errAppend(p.validErr, p.capBrokenErr)
 		}
 		p.validated = true
 	}
