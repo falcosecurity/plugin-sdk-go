@@ -1,12 +1,10 @@
 # plugin-sdk-go
 
+[![Falco Core Repository](https://github.com/falcosecurity/evolution/blob/main/repos/badges/falco-core-blue.svg)](https://github.com/falcosecurity/evolution/blob/main/REPOSITORIES.md#core-scope) [![Stable](https://img.shields.io/badge/status-stable-brightgreen?style=for-the-badge)](https://github.com/falcosecurity/evolution/blob/main/REPOSITORIES.md#stable) [![License](https://img.shields.io/github/license/falcosecurity/rules?style=for-the-badge)](./LICENSE)
+
 [![Go Reference](https://pkg.go.dev/badge/github.com/falcosecurity/plugin-sdk-go/pkg/sdk.svg)](https://pkg.go.dev/github.com/falcosecurity/plugin-sdk-go/pkg/sdk)
 [![Release](https://img.shields.io/github/release/falcosecurity/plugin-sdk-go.svg?style=flat-square)](https://github.com/falcosecurity/plugin-sdk-go/releases/latest)
 [![Go Report Card](https://goreportcard.com/badge/github.com/falcosecurity/plugin-sdk-go?style=flat-square)](https://goreportcard.com/report/github.com/falcosecurity/plugin-sdk-go)
-[![License](https://img.shields.io/github/license/falcosecurity/plugin-sdk-go?style=flat-square)](LICENSE)
-
-
-Note: *The plugin system is a new feature introduced since Falco 0.31.0. You can find more detail in the original [proposal document](https://github.com/falcosecurity/falco/blob/master/proposals/20210501-plugin-system.md).*
 
 ## Introduction
 
