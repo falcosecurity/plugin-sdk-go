@@ -117,17 +117,21 @@ func splitVersionString(version string) (string, string, string) {
 
 func SetRequiredAPIVersion(apiVer string) {
 	if apiVer != "" {
-		requiredMajor, requiredMinor, requiredPatch := splitVersionString(apiVer)
-		pluginMajor, pluginMinor, pluginPatch := splitVersionString(C.GoString(C.get_default_required_api_version()))
+		pluginRequiredMajor, pluginRequiredMinor, pluginRequiredPatch := splitVersionString(apiVer)
+		sdkRequiredMajor, sdkRequiredMinor, sdkRequiredPatch := splitVersionString(C.GoString(C.get_default_required_api_version()))
 
-		if pluginMajor != requiredMajor {
-			panic("Plugin SDK Go required API version incompatible major number. Expected: Major version should be equal to " + pluginMajor + " but got " + requiredMajor)
+		// The plugin should always require a version lower or equal to the one required by the SDK
+		// because the SDK couldn't support features coming from new framework versions.
+		// On the other side the plugin could require a lower version because maybe it doesn't
+		// need all features provided by the framework.
+		if sdkRequiredMajor != pluginRequiredMajor {
+			panic("Incompatible required Major version between SDK and the plugin. Major SDK version is equal to " + sdkRequiredMajor + " but the plugin uses " + pluginRequiredMajor + ". The 2 Major versions should be equal.")
 		}
-		if pluginMinor < requiredMinor {
-			panic("Plugin SDK Go required API version incompatible minor number. Expected: Minor version should be less than/equal to " + pluginMinor + " but got " + requiredMinor)
+		if sdkRequiredMinor < pluginRequiredMinor {
+			panic("The plugin requires a Minor version greater than the SDK one. Minor SDK version is equal to " + sdkRequiredMinor + " but the plugin uses " + pluginRequiredMinor + ". The plugin should always require a Minor version lower or equal to the SDK one.")
 		}
-		if pluginMinor == requiredMinor && pluginPatch < requiredPatch {
-			panic("Plugin SDK Go required API version incompatible patch number. Expected: Patch version should be less than/equal to " + pluginPatch + " but got " + requiredPatch)
+		if sdkRequiredMinor == pluginRequiredMinor && sdkRequiredPatch < pluginRequiredPatch {
+			panic("The plugin requires a Patch version greater than the SDK one. Patch SDK version is equal to " + sdkRequiredPatch + " but the plugin uses " + pluginRequiredPatch + ". The plugin should always require a Patch version lower or equal to the SDK one.")
 		}
 	}
 	pRequiredAPIVersion.Write(apiVer)
