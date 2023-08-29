@@ -27,7 +27,7 @@ limitations under the License.
   \return The length of the source string.
 */
 
-static inline size_t strlcpy(char *dst, const char *src, size_t size) {
+inline size_t strlcpy(char *dst, const char *src, size_t size) {
     size_t srcsize = strlen(src);
     if (size == 0) {
         return srcsize;
