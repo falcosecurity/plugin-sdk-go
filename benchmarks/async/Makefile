@@ -25,5 +25,5 @@ clean:
 
 $(OUTPUT): bench.cpp bench.go
 	mkdir -p $(OUTPUTDIR)
-	GODEBUG=cgocheck=2 $(GO) build -buildmode=c-archive -o $(OUTPUTGO) bench.go
+	GODEBUG=cgocheck=1 $(GO) build -buildmode=c-archive -o $(OUTPUTGO) bench.go
 	$(CXX) bench.cpp $(OUTPUTGO) -std=c++11 -pthread -o $(OUTPUT)
