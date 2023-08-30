@@ -13,6 +13,7 @@
 SHELL := /bin/bash
 GO    ?= $(shell which go)
 CURL  ?= $(shell which curl)
+PATCH ?= $(shell which patch)
 
 FALCOSECURITY_LIBS_REVISION ?= 0b9ca98fee2453a16f4538db55dcfa34bc8f5aef
 FALCOSECURITY_LIBS_REPO ?= falcosecurity/libs
@@ -34,6 +35,7 @@ pluginlib:
 	$(CURL) -Lso pkg/sdk/plugin_api.h $(PLUGINLIB_URL)/plugin_api.h
 	$(CURL) -Lso pkg/loader/plugin_loader.h $(PLUGINLIB_URL)/plugin_loader.h
 	$(CURL) -Lso pkg/loader/plugin_loader.c $(PLUGINLIB_URL)/plugin_loader.c
+	$(PATCH) -p1 < pkg/loader/strlcpy.patch
 
 clean-pluginlib:
 	rm -f \
