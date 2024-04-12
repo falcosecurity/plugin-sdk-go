@@ -19,3 +19,19 @@ jobs:
 
       - name: Run tests
         run: go test ./...
+
+  build-example-plugins:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout plugin-sdk-go
+        uses: actions/checkout@v3
+
+      - name: Setup Golang
+        uses: actions/setup-go@v4
+        with:
+          go-version: '^1.19'
+      
+      - name: Build all example plugins
+        run: make examples
+
