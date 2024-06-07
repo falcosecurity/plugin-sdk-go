@@ -17,6 +17,12 @@ limitations under the License.
 
 package cgo
 
+import (
+	"fmt"
+	"sync/atomic"
+	"unsafe"
+)
+
 // Handle is an alternative implementation of cgo.Handle introduced by
 // Go 1.17, see https://pkg.go.dev/runtime/cgo. This implementation
 // optimizes performance in use cases related to plugins. It is intended
@@ -43,12 +49,18 @@ package cgo
 // The usage in other contexts is discuraged.
 type Handle uintptr
 
-// MaxHandle is the largest value that an Handle can hold
-const MaxHandle = 256 - 1
+const (
+	// MaxHandle is the largest value that an Handle can hold
+	MaxHandle = 256 - 1
+
+	// max number of times we're willing to iterate over the vector of reusable
+	// handles to do compare-and-swap before giving up
+	maxNewHandleRounds = 20
+)
 
 var (
-	handles  [MaxHandle + 1]interface{} // [int]interface{}
-	noHandle int                        = 0
+	handles  [MaxHandle + 1]unsafe.Pointer // [int]*interface{}
+	noHandle unsafe.Pointer                = nil
 )
 
 func init() {
@@ -72,13 +84,30 @@ func init() {
 //
 // This function is not thread-safe.
 func NewHandle(v interface{}) Handle {
-	for i := 1; i <= MaxHandle; i++ {
-		if handles[i] == &noHandle {
-			handles[i] = v
-			return Handle(i)
+	rounds := 0
+	for h := uintptr(1); ; h++ {
+		// we acquired ownership of an handle, return it
+		// note: we attempt accessing slots 1..MaxHandle (included)
+		if atomic.CompareAndSwapPointer(&handles[h], noHandle, (unsafe.Pointer)(&v)) {
+			return Handle(h)
 		}
+
+		// we haven't acquired a handle, but we can try with the next one
+		if h < MaxHandle {
+			continue
+		}
+
+		// we iterated over the whole vector of handles, so we get back to start
+		// and try again with another round. Once we do this too many times,
+		// we have no choice if not panic-ing
+		h = uintptr(0) // note: will be incremented when continuing
+		if rounds < maxNewHandleRounds {
+			rounds++
+			continue
+		}
+
+		panic(fmt.Sprintf("plugin-sdk-go/cgo: could not obtain a new handle after round #%d", rounds))
 	}
-	panic("plugin-sdk-go/cgo: ran out of handle space")
 }
 
 // Value returns the associated Go value for a valid handle.
@@ -86,10 +115,10 @@ func NewHandle(v interface{}) Handle {
 // The method panics if the handle is invalid.
 // This function is not thread-safe.
 func (h Handle) Value() interface{} {
-	if h > MaxHandle || handles[h] == &noHandle {
-		panic("plugin-sdk-go/cgo: misuse of an invalid Handle")
+	if h > MaxHandle || atomic.LoadPointer(&handles[h]) == noHandle {
+		panic(fmt.Sprintf("plugin-sdk-go/cgo: misuse (value) of an invalid Handle %d", h))
 	}
-	return handles[h]
+	return *(*interface{})(atomic.LoadPointer(&handles[h]))
 }
 
 // Delete invalidates a handle. This method should only be called once
@@ -99,14 +128,14 @@ func (h Handle) Value() interface{} {
 // The method panics if the handle is invalid.
 // This function is not thread-safe.
 func (h Handle) Delete() {
-	if h > MaxHandle || handles[h] == &noHandle {
-		panic("plugin-sdk-go/cgo: misuse of an invalid Handle")
+	if h > MaxHandle || atomic.LoadPointer(&handles[h]) == noHandle {
+		panic(fmt.Sprintf("plugin-sdk-go/cgo: misuse (delete) of an invalid Handle %d", h))
 	}
-	handles[h] = &noHandle
+	atomic.StorePointer(&handles[h], noHandle)
 }
 
 func resetHandles() {
 	for i := 0; i <= MaxHandle; i++ {
-		handles[i] = &noHandle
+		atomic.StorePointer(&handles[i], noHandle)
 	}
 }

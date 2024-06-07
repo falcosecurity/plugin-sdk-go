@@ -19,6 +19,7 @@ package cgo
 
 import (
 	"reflect"
+	"sync/atomic"
 	"testing"
 )
 
@@ -61,7 +62,7 @@ func TestHandle(t *testing.T) {
 
 	siz := 0
 	for i := 0; i < MaxHandle; i++ {
-		if handles[i] != &noHandle {
+		if atomic.LoadPointer(&handles[i]) != noHandle {
 			siz++
 		}
 	}
