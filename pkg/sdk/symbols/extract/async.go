@@ -92,6 +92,10 @@ const (
 	// asyncBatchSize is the physical size of batches allocated
 	// in C memory, namely the total number of locks available
 	asyncBatchSize = cgo.MaxHandle + 1
+	//
+	// max number of seconds we're willing to wait for a worker to exit
+	// once released before triggering a panic
+	workerReleaseTimeoutInSeconds = 10
 )
 
 var (
@@ -186,7 +190,9 @@ func (a *asyncContext) acquireWorker(workerIdx int32) {
 			for _, i := range batchIdxs {
 				// reduce sync overhead by skipping unused batch slots
 				if i > a.maxBatchIdx {
-					continue
+					// from this point on we'll only encountered unused slots
+					// so we mind as well just start over
+					break
 				}
 
 				// check for incoming request, if any, otherwise busy waits
@@ -244,13 +250,23 @@ func (a *asyncContext) releaseWorker(workerIdx int32) {
 	// side, we use the first visible slot and set an exit request. The worker
 	// will eventually synchronize with the used lock and stop.
 	idx := a.workerIdxToBatchIdxs(workerIdx)[0]
+	waitStartTime := time.Now()
 	for !atomic.CompareAndSwapInt32((*int32)(&a.batch[idx].lock), state_unused, state_exit_req) {
-		// spin
+		// spinning, but let's yield first
+		runtime.Gosched()
+		if time.Since(waitStartTime).Seconds() > workerReleaseTimeoutInSeconds {
+			panic("plugin-sdk-go/sdk/symbols/extract: async worker release timeout expired (1)")
+		}
 	}
 
 	// wait for worker exiting
+	waitStartTime = time.Now()
 	for atomic.LoadInt32((*int32)(&a.batch[idx].lock)) != state_exit_ack {
-		// spin
+		// spinning, but let's yield first
+		runtime.Gosched()
+		if time.Since(waitStartTime).Seconds() > workerReleaseTimeoutInSeconds {
+			panic("plugin-sdk-go/sdk/symbols/extract: async worker release timeout expired (2)")
+		}
 	}
 
 	// restore first worker slot
