@@ -1,6 +1,9 @@
 project_name: plugin-sdk-go
-build:
-  skip: true
+version: 2
+
+builds:
+  - skip: true
+
 release:
-  github:
+  github: {}
   prerelease: auto
