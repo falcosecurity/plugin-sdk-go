@@ -109,6 +109,15 @@ type ExtractRequest interface {
 	// SetPtr sets a pointer to a ss_plugin_extract_field C structure to
 	// be wrapped in this instance of ExtractRequest.
 	SetPtr(unsafe.Pointer)
+	//
+	// WantOffsets returns true if the caller is requesting the field start
+	// and end offset.
+	WantOffsets() bool
+	//
+	// SetOffsets sets the start and end offsets of the field. {0,0} can
+	// be used to indicate that the field doesn't correspond to any bytes
+	// in the event or log data.
+	SetOffsets(startOffset uint32, endOffset uint32)
 }
 
 // ExtractRequestPool represents a pool of reusable ExtractRequest objects.
@@ -361,4 +370,13 @@ func (e *extractRequest) SetValue(v interface{}) {
 		panic("plugin-sdk-go/sdk: called SetValue with unsupported field type")
 	}
 	*((*C.uintptr_t)(unsafe.Pointer(&e.req.res))) = *(*C.uintptr_t)(unsafe.Pointer(&e.resBuf))
+}
+
+func (e *extractRequest) WantOffsets() bool {
+	return e.req.extract_offsets != 0
+}
+
+func (e *extractRequest) SetOffsets(startOffset uint32, endOffset uint32) {
+	e.req.start_offset = (C.uint32_t)(startOffset)
+	e.req.end_offset = (C.uint32_t)(endOffset)
 }
