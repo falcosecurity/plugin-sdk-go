@@ -77,6 +77,14 @@ func allocSSPluginExtractField(fid, ftype uint32, fname, farg string) (*_Ctype_s
 	}
 }
 
+func allocSSPluginExtractValueOffsets(start *uint32, length *uint32) (*_Ctype_ss_plugin_extract_value_offsets) {
+	ret := &_Ctype_ss_plugin_extract_value_offsets{}
+	ret.start = (*_Ctype_uint32_t)(start)
+	ret.length = (*_Ctype_uint32_t)(length)
+
+	return ret
+}
+
 func allocSSPluginEvent(num, ts uint64, data []byte) (*_Ctype_struct_ss_plugin_event_input, func()) {
 	ret := &_Ctype_struct_ss_plugin_event_input{}
 	evts, _ := sdk.NewEventWriters(1, int64(len(data)))
@@ -118,11 +126,22 @@ func TestExtract(t *testing.T) {
 	// panic
 	badHandle := cgo.NewHandle(1)
 	assertPanic(t, func() {
-		plugin_extract_fields_sync(_Ctype_uintptr_t(badHandle), event, 1, field)
+		plugin_extract_fields_sync(_Ctype_uintptr_t(badHandle), event, 1, field, nil)
 	})
 
 	// success
-	res = plugin_extract_fields_sync(_Ctype_uintptr_t(handle), event, 1, field)
+	res = plugin_extract_fields_sync(_Ctype_uintptr_t(handle), event, 1, field, nil)
+	if res != sdk.SSPluginSuccess {
+		t.Errorf("(res): expected %d, but found %d", sdk.SSPluginSuccess, res)
+	} else if sample.lastErr != nil {
+		t.Errorf("(lastErr): should be nil")
+	}
+
+	// success + offsets
+	val_start := uint32(0)
+	val_length := uint32(8)
+	offsets := allocSSPluginExtractValueOffsets(&val_start, &val_length)
+	res = plugin_extract_fields_sync(_Ctype_uintptr_t(handle), event, 1, field, offsets)
 	if res != sdk.SSPluginSuccess {
 		t.Errorf("(res): expected %d, but found %d", sdk.SSPluginSuccess, res)
 	} else if sample.lastErr != nil {
@@ -131,7 +150,7 @@ func TestExtract(t *testing.T) {
 
 	// error
 	sample.err = errTest
-	res = plugin_extract_fields_sync(_Ctype_uintptr_t(handle), event, 1, field)
+	res = plugin_extract_fields_sync(_Ctype_uintptr_t(handle), event, 1, field, nil)
 	if res != sdk.SSPluginFailure {
 		t.Errorf("(res): expected %d, but found %d", sdk.SSPluginFailure, res)
 	} else if sample.lastErr != errTest {

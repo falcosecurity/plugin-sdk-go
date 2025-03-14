@@ -1,0 +1,13 @@
+diff --git a/pkg/sdk/plugin_api.h b/pkg/sdk/plugin_api.h
+index 0c877a2..54949b3 100644
+--- a/pkg/sdk/plugin_api.h
++++ b/pkg/sdk/plugin_api.h
+@@ -18,7 +18,7 @@ limitations under the License.
+ 
+ #pragma once
+ 
+-#include <plugin/plugin_types.h>
++#include "plugin_types.h"
+ 
+ #ifdef __cplusplus
+ extern "C" {

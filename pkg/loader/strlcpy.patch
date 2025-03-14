@@ -1,17 +1,19 @@
 diff --git a/pkg/loader/plugin_loader.c b/pkg/loader/plugin_loader.c
-index aad119f..169f696 100644
+index 2943335..7bebeeb 100644
 --- a/pkg/loader/plugin_loader.c
 +++ b/pkg/loader/plugin_loader.c
-@@ -23,23 +23,53 @@ limitations under the License.
-     typedef void* library_handle_t;
+@@ -24,22 +24,52 @@ typedef HINSTANCE library_handle_t;
+ typedef void* library_handle_t;
  #endif
  
--#include "strlcpy.h"
+-#include <libscap/strl.h>
+ #include <stddef.h>
  #include <stdio.h>
  #include <stdlib.h>
  #include <string.h>
- #include "plugin_loader.h"
- 
+-#include <plugin/plugin_loader.h>
++#include "plugin_loader.h"
++
 +// note(jasondellaluce,therealbobo): implementation taken from falcosecurity/libs
 +// note(leogr): to avoid clashing with `strlcpy` introduced by glibc 2.38, 
 +//              the func has been renamed to plugin_loader_strlcpy.
@@ -42,84 +44,89 @@ index aad119f..169f696 100644
 +
 +    return srcsize;
 +}
-+
- static inline void err_prepend(char* s, const char* prefix, const char* sep)
- {
-     char tmp[PLUGIN_MAX_ERRLEN];
--    size_t prefix_len = strlcpy(tmp, prefix, PLUGIN_MAX_ERRLEN);
-+    size_t prefix_len = plugin_loader_strlcpy(tmp, prefix, PLUGIN_MAX_ERRLEN);
-     if (*s != '\0')
-     {
--        strlcpy(&tmp[prefix_len], sep, PLUGIN_MAX_ERRLEN - prefix_len);
-+        plugin_loader_strlcpy(&tmp[prefix_len], sep, PLUGIN_MAX_ERRLEN - prefix_len);
-         prefix_len += strlen(sep);
-     }
--    strlcpy(&tmp[prefix_len], s, PLUGIN_MAX_ERRLEN - prefix_len);
--    strlcpy(s, tmp, PLUGIN_MAX_ERRLEN);
-+    plugin_loader_strlcpy(&tmp[prefix_len], s, PLUGIN_MAX_ERRLEN - prefix_len);
-+    plugin_loader_strlcpy(s, tmp, PLUGIN_MAX_ERRLEN);
+ 
+ static inline void err_prepend(char* s, const char* prefix, const char* sep) {
+ 	char tmp[PLUGIN_MAX_ERRLEN];
+-	size_t prefix_len = strlcpy(tmp, prefix, PLUGIN_MAX_ERRLEN);
++	size_t prefix_len = plugin_loader_strlcpy(tmp, prefix, PLUGIN_MAX_ERRLEN);
+ 	if(*s != '\0') {
+-		strlcpy(&tmp[prefix_len], sep, PLUGIN_MAX_ERRLEN - prefix_len);
++		plugin_loader_strlcpy(&tmp[prefix_len], sep, PLUGIN_MAX_ERRLEN - prefix_len);
+ 		prefix_len += strlen(sep);
+ 	}
+-	strlcpy(&tmp[prefix_len], s, PLUGIN_MAX_ERRLEN - prefix_len);
+-	strlcpy(s, tmp, PLUGIN_MAX_ERRLEN);
++	plugin_loader_strlcpy(&tmp[prefix_len], s, PLUGIN_MAX_ERRLEN - prefix_len);
++	plugin_loader_strlcpy(s, tmp, PLUGIN_MAX_ERRLEN);
  }
  
- static inline void err_append(char* s, const char* suffix, const char* sep)
-@@ -71,7 +101,7 @@ plugin_handle_t* plugin_load(const char* path, char* err)
-     plugin_handle_t* ret = (plugin_handle_t*) calloc (1, sizeof(plugin_handle_t));
-     if (!ret)
-     {
--        strlcpy(err, "error allocating plugin handle", PLUGIN_MAX_ERRLEN);
-+        plugin_loader_strlcpy(err, "error allocating plugin handle", PLUGIN_MAX_ERRLEN);
-         return NULL;
-     }
+ static inline void err_append(char* s, const char* suffix, const char* sep) {
+@@ -65,7 +95,7 @@ plugin_handle_t* plugin_load(const char* path, char* err) {
+ 	err[0] = '\0';
+ 	plugin_handle_t* ret = (plugin_handle_t*)calloc(1, sizeof(plugin_handle_t));
+ 	if(!ret) {
+-		strlcpy(err, "error allocating plugin handle", PLUGIN_MAX_ERRLEN);
++		plugin_loader_strlcpy(err, "error allocating plugin handle", PLUGIN_MAX_ERRLEN);
+ 		return NULL;
+ 	}
  
-@@ -86,7 +116,7 @@ plugin_handle_t* plugin_load(const char* path, char* err)
-         LPTSTR msg_buf = 0;
-         if (FormatMessageA(flg, 0, GetLastError(), 0, (LPTSTR) &msg_buf, 0, NULL) && msg_buf)
-         {
--            strlcpy(err, msg_buf, PLUGIN_MAX_ERRLEN);
-+            plugin_loader_strlcpy(err, msg_buf, PLUGIN_MAX_ERRLEN);
-             LocalFree(msg_buf);
-         }
-     }
-@@ -94,7 +124,7 @@ plugin_handle_t* plugin_load(const char* path, char* err)
-     ret->handle = dlopen(path, RTLD_LAZY|RTLD_DEEPBIND);
-     if (ret->handle == NULL)
-     {
--        strlcpy(err, (const char*) dlerror(), PLUGIN_MAX_ERRLEN);
-+        plugin_loader_strlcpy(err, (const char*) dlerror(), PLUGIN_MAX_ERRLEN);
-     }
+@@ -77,14 +107,14 @@ plugin_handle_t* plugin_load(const char* path, char* err) {
+ 		            FORMAT_MESSAGE_IGNORE_INSERTS;
+ 		LPTSTR msg_buf = 0;
+ 		if(FormatMessageA(flg, 0, GetLastError(), 0, (LPTSTR)&msg_buf, 0, NULL) && msg_buf) {
+-			strlcpy(err, msg_buf, PLUGIN_MAX_ERRLEN);
++			plugin_loader_strlcpy(err, msg_buf, PLUGIN_MAX_ERRLEN);
+ 			LocalFree(msg_buf);
+ 		}
+ 	}
+ #else
+ 	ret->handle = dlopen(path, RTLD_LAZY);
+ 	if(ret->handle == NULL) {
+-		strlcpy(err, (const char*)dlerror(), PLUGIN_MAX_ERRLEN);
++		plugin_loader_strlcpy(err, (const char*)dlerror(), PLUGIN_MAX_ERRLEN);
+ 	}
  #endif
  
-@@ -143,14 +173,14 @@ plugin_handle_t* plugin_load_api(const plugin_api* api, char* err)
-     err[0] = '\0';
-     if (!api)
-     {
--        strlcpy(err, "can't allocate plugin handle with invalid API table", PLUGIN_MAX_ERRLEN);
-+        plugin_loader_strlcpy(err, "can't allocate plugin handle with invalid API table", PLUGIN_MAX_ERRLEN);
-         return NULL;
-     }
+@@ -135,13 +165,13 @@ plugin_handle_t* plugin_load_api(const plugin_api* api, char* err) {
+ 	// alloc and init memory
+ 	err[0] = '\0';
+ 	if(!api) {
+-		strlcpy(err, "can't allocate plugin handle with invalid API table", PLUGIN_MAX_ERRLEN);
++		plugin_loader_strlcpy(err, "can't allocate plugin handle with invalid API table", PLUGIN_MAX_ERRLEN);
+ 		return NULL;
+ 	}
  
-     plugin_handle_t* ret = (plugin_handle_t*) calloc (1, sizeof(plugin_handle_t));
-     if (!ret)
-     {
--        strlcpy(err, "error allocating plugin handle", PLUGIN_MAX_ERRLEN);
-+        plugin_loader_strlcpy(err, "error allocating plugin handle", PLUGIN_MAX_ERRLEN);
-         return NULL;
-     }
-     ret->api = *api;
-@@ -203,7 +233,7 @@ bool plugin_check_required_api_version(const plugin_handle_t* h, char* err)
-     const char *ver, *failmsg;
-     if (h->api.get_required_api_version == NULL)
-     {
--        strlcpy(err, "plugin_get_required_api_version symbol not implemented", PLUGIN_MAX_ERRLEN);
-+        plugin_loader_strlcpy(err, "plugin_get_required_api_version symbol not implemented", PLUGIN_MAX_ERRLEN);
-         return false;
-     }
+ 	plugin_handle_t* ret = (plugin_handle_t*)calloc(1, sizeof(plugin_handle_t));
+ 	if(!ret) {
+-		strlcpy(err, "error allocating plugin handle", PLUGIN_MAX_ERRLEN);
++		plugin_loader_strlcpy(err, "error allocating plugin handle", PLUGIN_MAX_ERRLEN);
+ 		return NULL;
+ 	}
+ 	ret->api = *api;
+@@ -150,7 +180,7 @@ plugin_handle_t* plugin_load_api(const plugin_api* api, char* err) {
+ 	uint32_t major, minor, patch;
+ 	const char* ver;
+ 	if(api->get_required_api_version == NULL) {
+-		strlcpy(err, "plugin_get_required_api_version symbol not implemented", PLUGIN_MAX_ERRLEN);
++		plugin_loader_strlcpy(err, "plugin_get_required_api_version symbol not implemented", PLUGIN_MAX_ERRLEN);
+ 		return NULL;
+ 	}
  
-@@ -243,7 +273,7 @@ bool plugin_check_required_api_version(const plugin_handle_t* h, char* err)
- plugin_caps_t plugin_get_capabilities(const plugin_handle_t* h, char* err)
- {
-     plugin_caps_t caps = CAP_NONE;
--    strlcpy(err, "", PLUGIN_MAX_ERRLEN);
-+    plugin_loader_strlcpy(err, "", PLUGIN_MAX_ERRLEN);
+@@ -217,7 +247,7 @@ bool plugin_check_required_api_version(const plugin_handle_t* h, char* err) {
+ 	uint32_t major, minor, patch;
+ 	const char *ver, *failmsg;
+ 	if(h->api.get_required_api_version == NULL) {
+-		strlcpy(err, "plugin_get_required_api_version symbol not implemented", PLUGIN_MAX_ERRLEN);
++		plugin_loader_strlcpy(err, "plugin_get_required_api_version symbol not implemented", PLUGIN_MAX_ERRLEN);
+ 		return false;
+ 	}
  
-     if (h->api.open != NULL && h->api.close != NULL && h->api.next_batch != NULL)
-     {
+@@ -256,7 +286,7 @@ bool plugin_check_required_api_version(const plugin_handle_t* h, char* err) {
+ 
+ plugin_caps_t plugin_get_capabilities(const plugin_handle_t* h, char* err) {
+ 	plugin_caps_t caps = CAP_NONE;
+-	strlcpy(err, "", PLUGIN_MAX_ERRLEN);
++	plugin_loader_strlcpy(err, "", PLUGIN_MAX_ERRLEN);
+ 
+ 	if(h->api.open != NULL && h->api.close != NULL && h->api.next_batch != NULL) {
+ 		bool has_id = h->api.get_id != NULL && h->api.get_id() != 0;

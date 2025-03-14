@@ -58,6 +58,12 @@ func allocSSPluginExtractField(fid, ftype uint32, fname, farg_key string, farg_i
 	}
 }
 
+func allocSSPluginExtractOffset() (*_Ctype_ss_plugin_extract_value_offsets) {
+	ret := &_Ctype_ss_plugin_extract_value_offsets{start: nil, length: nil}
+
+	return ret
+}
+
 func getBoolResSSPluingExtractField(t *testing.T, ptr *_Ctype_ss_plugin_extract_field, index int) bool {
 	if ptr.res_len < (_Ctype_uint64_t)(index) {
 		t.Errorf("trying to access extract field res at index %d, but res len is %d", index, (int)(ptr.res_len))
@@ -96,6 +102,14 @@ func getBinResSSPluingExtractField(t *testing.T, p *_Ctype_ss_plugin_extract_fie
 	return buf
 }
 
+func getResSSPluginExtractStartOffset(ptr *_Ctype_ss_plugin_extract_value_offsets, index int) uint32 {
+	return (uint32)(*((*_Ctype_uint32_t)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&ptr.start))) + uintptr(index*_Ciconst_sizeof_uint32_t)))))
+}
+
+func getResSSPluginExtractLength(ptr *_Ctype_ss_plugin_extract_value_offsets, index int) uint32 {
+	return (uint32)(*((*_Ctype_uint32_t)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&ptr.length))) + uintptr(index*_Ciconst_sizeof_uint32_t)))))
+}
+
 func assertPanic(t *testing.T, fun func()) {
 	defer func() {
 		if r := recover(); r == nil {
@@ -126,10 +140,14 @@ func TestExtractRequestSetValue(t *testing.T) {
 	// init test data
 	testStr := "test str"
 	testU64 := uint64(99)
+	testU64Start := uint32(PluginEventHeaderSize)
+	testU64Length := uint32(8)
 	testBool := true
 	testIPv6 := net.IPv6loopback
 	testStrList := make([]string, 0)
 	testU64List := make([]uint64, 0)
+	testU64ListStart := make([]uint32, 0)
+	testU64ListOffsets := make([]ValueOffset, 0)
 	testBoolList := make([]bool, 0)
 	dataArray := make([]byte, (minResultBufferLen+1)*int(len(testIPv6)))
 	for i := 0; i < (minResultBufferLen+1)*int(len(testIPv6)); i++ {
@@ -139,6 +157,8 @@ func TestExtractRequestSetValue(t *testing.T) {
 	for i := 0; i < minResultBufferLen+1; i++ {
 		testStrList = append(testStrList, fmt.Sprintf("test-%d", i))
 		testU64List = append(testU64List, uint64(i))
+		testU64ListStart = append(testU64ListStart, uint32(PluginEventHeaderSize + (i * 8)))
+		testU64ListOffsets = append(testU64ListOffsets, ValueOffset{Start: testU64ListStart[i], Length: testU64Length})
 		testBoolList = append(testBoolList, i%3 == 0)
 		testIPv6List[i] = dataArray[i*len(testIPv6) : (i+1)*len(testIPv6)]
 	}
@@ -146,7 +166,9 @@ func TestExtractRequestSetValue(t *testing.T) {
 	// init extract requests
 	pool := NewExtractRequestPool()
 	u64Ptr, freeU64Ptr := allocSSPluginExtractField(1, FieldTypeUint64, "test.u64", "", 0, true, false)
+	u64OffsetPtr := allocSSPluginExtractOffset()
 	u64ListPtr, freeU64ListPtr := allocSSPluginExtractField(2, FieldTypeUint64, "test.u64", "", 0, true, true)
+	u64ListOffsetPtr := allocSSPluginExtractOffset()
 	strPtr, freeStrPtr := allocSSPluginExtractField(3, FieldTypeCharBuf, "test.str", "", 0, true, false)
 	strListPtr, freeStrListPtr := allocSSPluginExtractField(4, FieldTypeCharBuf, "test.str", "", 0, true, true)
 	boolPtr, freeBoolPtr := allocSSPluginExtractField(5, FieldTypeBool, "test.bool", "", 0, true, false)
@@ -162,7 +184,9 @@ func TestExtractRequestSetValue(t *testing.T) {
 	binReq := pool.Get(6)
 	binReqList := pool.Get(7)
 	u64Req.SetPtr(unsafe.Pointer(u64Ptr))
+	u64Req.SetOffsetPtr(unsafe.Pointer(u64OffsetPtr))
 	u64ReqList.SetPtr(unsafe.Pointer(u64ListPtr))
+	u64ReqList.SetOffsetPtr(unsafe.Pointer(u64ListOffsetPtr))
 	strReq.SetPtr(unsafe.Pointer(strPtr))
 	strReqList.SetPtr(unsafe.Pointer(strListPtr))
 	boolReq.SetPtr(unsafe.Pointer(boolPtr))
@@ -223,10 +247,24 @@ func TestExtractRequestSetValue(t *testing.T) {
 	if getU64ResSSPluingExtractField(t, u64Ptr, 0) != testU64 {
 		t.Errorf("expected value '%d', but found '%d'", testU64, getU64ResSSPluingExtractField(t, u64Ptr, 0))
 	}
+	u64Req.SetValueOffsets(ValueOffset{Start: testU64Start, Length: testU64Length})
+	if getResSSPluginExtractStartOffset(u64OffsetPtr, 0) != testU64Start {
+		t.Errorf("expected start offset '%d', but found '%d'", testU64Start, getResSSPluginExtractStartOffset(u64OffsetPtr, 0))
+	}
+	if getResSSPluginExtractLength(u64OffsetPtr, 0) != testU64Length {
+		t.Errorf("expected length '%d', but found '%d'", testU64Length, getResSSPluginExtractLength(u64OffsetPtr, 0))
+	}
 	u64ReqList.SetValue(testU64List)
+	u64ReqList.SetValueOffsets(testU64ListOffsets...)
 	for i, d := range testU64List {
 		if getU64ResSSPluingExtractField(t, u64ListPtr, i) != d {
 			t.Errorf("expected value '%d', but found '%d'", testU64, getU64ResSSPluingExtractField(t, u64Ptr, i))
+		}
+		if getResSSPluginExtractStartOffset(u64ListOffsetPtr, i) != testU64ListStart[i] {
+			t.Errorf("expected start offset '%d', but found '%d'", testU64ListStart[i], getResSSPluginExtractStartOffset(u64ListOffsetPtr, i))
+		}
+		if getResSSPluginExtractLength(u64ListOffsetPtr, i) != testU64Length {
+			t.Errorf("expected length '%d', but found '%d'", testU64Length, getResSSPluginExtractLength(u64ListOffsetPtr, i))
 		}
 	}
 	strReq.SetValue(testStr)

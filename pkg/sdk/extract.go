@@ -51,6 +51,16 @@ const (
 	minResultBufferLen = 512
 )
 
+// ValueOffset denotes the start offset and length of a field. The start
+// offset must be from the beginning of the event to the start of the
+// field data. sdk.PluginEventHeaderSize should be used to get the event
+// header size. {0,0} can be used to indicate that the field doesn't
+// correspond to any bytes in the event or log data.
+type ValueOffset struct {
+	Start uint32
+	Length uint32
+}
+
 // ExtractRequest represents an high-level abstraction that wraps a pointer to
 // a ss_plugin_extract_field C structure, providing methods for accessing its
 // fields in a go-friendly way.
@@ -106,9 +116,25 @@ type ExtractRequest interface {
 	//  - sdk.FieldTypeIPNet: net.IPNet, *net.IPNet
 	SetValue(v interface{})
 	//
+	// SetValueOffsets sets the start offset and length of one or more
+	// fields. The start offset for each field must be from the
+	// beginning of the event to the start of the field data.
+	// sdk.PluginEventHeaderSize should be used to get the event header
+	// size. {0,0} can be used to indicate that the field doesn't
+	// correspond to any bytes in the event or log data.
+	SetValueOffsets(offsets ...ValueOffset)
+	//
 	// SetPtr sets a pointer to a ss_plugin_extract_field C structure to
 	// be wrapped in this instance of ExtractRequest.
 	SetPtr(unsafe.Pointer)
+	//
+	// SetOffsetPtr sets a pointer to a ss_plugin_extract_value_offsets
+	// C structure to be wrapped in this instance of ExtractRequest.
+	SetOffsetPtr(unsafe.Pointer)
+	//
+	// WantOffsets returns true if the caller is requesting value start
+	// and end offsets.
+	WantOffsets() bool
 }
 
 // ExtractRequestPool represents a pool of reusable ExtractRequest objects.
@@ -166,6 +192,7 @@ func NewExtractRequestPool() ExtractRequestPool {
 
 type extractRequest struct {
 	req *C.ss_plugin_extract_field
+	reqOffsets *C.ss_plugin_extract_value_offsets
 	// Pointer to a C-allocated array of field_result_t
 	resBuf *C.field_result_t
 	// Length of the array pointed by resBuf
@@ -176,10 +203,18 @@ type extractRequest struct {
 	resBinBufs []ptr.BytesReadWriter
 	// List of *field_result_t to be filled with the values of a request
 	resValPtrs []unsafe.Pointer
+	// Pointer to C-allocated start offsets
+	resValStartOffsets *C.uint32_t
+	// Pointer to C-allocated lengths
+	resValLengths *C.uint32_t
 }
 
 func (e *extractRequest) SetPtr(pef unsafe.Pointer) {
 	e.req = (*C.ss_plugin_extract_field)(pef)
+}
+
+func (e *extractRequest) SetOffsetPtr(pefo unsafe.Pointer) {
+	e.reqOffsets = (*C.ss_plugin_extract_value_offsets)(pefo)
 }
 
 func (e *extractRequest) FieldID() uint64 {
@@ -361,4 +396,27 @@ func (e *extractRequest) SetValue(v interface{}) {
 		panic("plugin-sdk-go/sdk: called SetValue with unsupported field type")
 	}
 	*((*C.uintptr_t)(unsafe.Pointer(&e.req.res))) = *(*C.uintptr_t)(unsafe.Pointer(&e.resBuf))
+}
+
+func (e *extractRequest) WantOffsets() bool {
+	return e.reqOffsets != nil
+}
+
+func (e *extractRequest) SetValueOffsets(offsets ...ValueOffset) {
+	if !e.WantOffsets() || len(offsets) == 0 {
+		return
+	}
+
+	C.free(unsafe.Pointer(e.resValStartOffsets))
+	e.resValStartOffsets = (*C.uint32_t)(C.malloc((C.size_t)(len(offsets) * C.sizeof_uint32_t)))
+	C.free(unsafe.Pointer(e.resValLengths))
+	e.resValLengths = (*C.uint32_t)(C.malloc((C.size_t)(len(offsets) * C.sizeof_uint32_t)))
+
+	for i, o := range offsets {
+		*((*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resValStartOffsets)) + uintptr(i * C.sizeof_uint32_t)))) = C.uint32_t(o.Start)
+		*((*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(e.resValLengths)) + uintptr(i * C.sizeof_uint32_t)))) = C.uint32_t(o.Length)
+	}
+
+	e.reqOffsets.start = (*C.uint32_t)(unsafe.Pointer(e.resValStartOffsets))
+	e.reqOffsets.length = (*C.uint32_t)(unsafe.Pointer(e.resValLengths))
 }
