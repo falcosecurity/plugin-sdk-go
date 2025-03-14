@@ -68,6 +68,7 @@ type ExtractRequest interface {
 	//  - sdk.FieldTypeAbsTime
 	//  - sdk.FieldTypeIPAddr
 	//  - sdk.FieldTypeIPNet
+	//  - sdk.FieldMetaTypeSlice
 	FieldType() uint32
 	//
 	// Field returns the name of the field for which the value extraction
@@ -104,6 +105,7 @@ type ExtractRequest interface {
 	//  - sdk.FieldTypeAbsTime: time.Time, *time.Time
 	//  - sdk.FieldTypeIPAddr: net.IP, *net.IP
 	//  - sdk.FieldTypeIPNet: net.IPNet, *net.IPNet
+	//  - sdk.FieldMetaTypeSlice: uint32[2]
 	SetValue(v interface{})
 	//
 	// SetPtr sets a pointer to a ss_plugin_extract_field C structure to
@@ -356,6 +358,21 @@ func (e *extractRequest) SetValue(v interface{}) {
 			}
 			(*C.struct_ss_plugin_byte_buffer)(ptr).len = C.uint32_t(len(val))
 			(*C.struct_ss_plugin_byte_buffer)(ptr).ptr = unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&val)).Data)
+		}
+	case FieldMetaTypeSlice:
+		if e.IsList() {
+			// Assume everything is contiguous for now. We can lift this
+			// restriction if that's not the case.
+			panic("plugin-sdk-go/sdk: lists of slices are unsupported")
+			// idx := 0
+			// for i, ptr := range e.resizeResValPtrs(len(v.([]uint32)), C.sizeof_uint32_t) {
+			// 	*((*C.uint32_t)(ptr)) = (C.uint32_t)(v.([][2]uint32)[idx][i % 2])
+			// 	idx += i % 2
+			// }
+		} else {
+			ptrPair := e.resizeResValPtrs(2, C.sizeof_uint32_t)
+			*((*C.uint32_t)(ptrPair[0])) = (C.uint32_t)(v.([2]uint32)[0])
+			*((*C.uint32_t)(ptrPair[1])) = (C.uint32_t)(v.([2]uint32)[1])
 		}
 	default:
 		panic("plugin-sdk-go/sdk: called SetValue with unsupported field type")

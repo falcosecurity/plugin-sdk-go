@@ -38,7 +38,9 @@ func testFormatVer(major, minor, patch int) string {
 func TestInfo(t *testing.T) {
 	var resU32 uint32
 	var resStr string
+	var resBool bool
 	var expectedStr string
+	var expectedBool bool
 
 	SetId(testU32)
 	resU32 = plugin_get_id()
@@ -101,6 +103,16 @@ func TestInfo(t *testing.T) {
 	resStr = ptr.GoString(unsafe.Pointer(plugin_get_extract_event_sources()))
 	if resStr != expectedStr {
 		t.Errorf("(extractEventSources) expected %s, but found %s", testStr, resStr)
+	}
+
+	expectedBool = true
+	SetExtractMetadataCapability(expectedBool)
+	resU32 =  plugin_get_extract_metadata_capability()
+	if resU32 == 1 {
+		resBool = true
+	}
+	if resBool != expectedBool {
+		t.Errorf("(extractMetadataCapability) expected %v, but found %v", expectedBool, resBool)
 	}
 }
 

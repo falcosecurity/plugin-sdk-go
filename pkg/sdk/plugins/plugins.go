@@ -27,14 +27,15 @@ import (
 
 // Info is a struct containing the general information about a plugin.
 type Info struct {
-	ID                  uint32
-	Name                string
-	Description         string
-	EventSource         string
-	Contact             string
-	Version             string
-	RequiredAPIVersion  string
-	ExtractEventSources []string
+	ID                        uint32
+	Name                      string
+	Description               string
+	EventSource               string
+	Contact                   string
+	Version                   string
+	RequiredAPIVersion        string
+	ExtractEventSources       []string
+	ExtractMetadataCapability bool
 }
 
 // Plugin is an interface representing a plugin.
@@ -167,7 +168,6 @@ type FactoryFunc func() Plugin
 //			return p
 //		})
 //	}
-//
 func SetFactory(f FactoryFunc) {
 
 	// Create a new plugin instance to get static plugin info
@@ -183,6 +183,7 @@ func SetFactory(f FactoryFunc) {
 	info.SetContact(i.Contact)
 	info.SetVersion(i.Version)
 	info.SetRequiredAPIVersion(i.RequiredAPIVersion)
+	info.SetExtractMetadataCapability(i.ExtractMetadataCapability)
 
 	// Set up plugin init schema, if any
 	if initSchema, ok := p.(sdk.InitSchema); ok {

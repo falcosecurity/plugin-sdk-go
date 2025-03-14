@@ -66,7 +66,12 @@ const (
 	FieldTypeIPAddr uint32 = 40
 	// Either an IPv4 or IPv6 network. The length indicates which one it is.
 	FieldTypeIPNet uint32 = 41
+	// Extract a Go- and Python-style zero-indexed start and end of the
+	// field's location in the event data as a uint32_t[2]. {0,0} can be
+	// used to indicate that the field doesn't correspond to a location.
+	FieldMetaTypeSlice uint32 = 1000000
 )
+
 
 // FieldEntry represents a single field entry that a plugin with field extraction
 // capability can expose.
