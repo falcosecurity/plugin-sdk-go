@@ -206,6 +206,7 @@ func (a *asyncContext) acquireWorker(workerIdx int32) {
 							a.batch[i].evt,
 							uint32(a.batch[i].num_fields),
 							a.batch[i].fields,
+							a.batch[i].value_offsets,
 						),
 					)
 					// processing done, return back to waiting state
