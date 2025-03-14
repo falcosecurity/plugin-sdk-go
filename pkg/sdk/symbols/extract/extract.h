@@ -30,6 +30,7 @@ typedef struct async_extractor_info
 	const ss_plugin_event_input *evt;
 	uint32_t num_fields;
 	ss_plugin_extract_field *fields;
+	ss_plugin_extract_value_offsets *value_offsets;
 
 	// output data
 	int32_t rc;

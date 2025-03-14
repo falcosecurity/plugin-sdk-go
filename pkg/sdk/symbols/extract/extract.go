@@ -39,12 +39,12 @@ import (
 )
 
 //export plugin_extract_fields_sync
-func plugin_extract_fields_sync(plgState C.uintptr_t, evt *C.ss_plugin_event_input, numFields uint32, fields *C.ss_plugin_extract_field) int32 {
+func plugin_extract_fields_sync(plgState C.uintptr_t, evt *C.ss_plugin_event_input, numFields uint32, fields *C.ss_plugin_extract_field, offsets *C.ss_plugin_extract_value_offsets) int32 {
 	pHandle := cgo.Handle(plgState)
 	extract := pHandle.Value().(sdk.Extractor)
 	extrReqs := pHandle.Value().(sdk.ExtractRequests)
 
-	// https://github.com/golang/go/wiki/cgo#turning-c-arrays-into-go-slices
+	// https://go.dev/wiki/cgo#turning-c-arrays-into-go-slices
 	flds := (*[1 << 28]C.struct_ss_plugin_extract_field)(unsafe.Pointer(fields))[:numFields:numFields]
 	var i uint32
 	var extrReq sdk.ExtractRequest
@@ -52,6 +52,10 @@ func plugin_extract_fields_sync(plgState C.uintptr_t, evt *C.ss_plugin_event_inp
 		flds[i].res_len = (C.uint64_t)(0)
 		extrReq = extrReqs.ExtractRequests().Get(int(flds[i].field_id))
 		extrReq.SetPtr(unsafe.Pointer(&flds[i]))
+		if offsets != nil {
+			offs := (*[1 << 28]C.struct_ss_plugin_extract_value_offsets)(unsafe.Pointer(offsets))[:numFields:numFields]
+			extrReq.SetOffsetPtr(unsafe.Pointer(&offs[i]))
+		}
 
 		err := extract.Extract(extrReq, sdk.NewEventReader(unsafe.Pointer(evt)))
 		if err != nil {

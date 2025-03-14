@@ -55,7 +55,8 @@ void async_deinit()
 extern int32_t plugin_extract_fields_sync(ss_plugin_t *s,
 										  const ss_plugin_event_input *evt,
 										  uint32_t num_fields,
-										  ss_plugin_extract_field *fields);
+										  ss_plugin_extract_field *fields,
+										  ss_plugin_extract_value_offsets *offsets);
 
 // This is the plugin API function. If s_async_ctx_batch is
 // non-NULL, it calls the async extractor function. Otherwise, it
@@ -78,7 +79,7 @@ FALCO_PLUGIN_SDK_PUBLIC int32_t plugin_extract_fields(ss_plugin_t *s,
 	if (s_async_ctx_batch == NULL
 		|| atomic_load_explicit(&s_async_ctx_batch[(size_t)s - 1].lock, memory_order_seq_cst) != WAIT)
 	{
-		return plugin_extract_fields_sync(s, evt, in->num_fields, in->fields);
+		return plugin_extract_fields_sync(s, evt, in->num_fields, in->fields, in->value_offsets);
 	}
 
 	// Set input data
@@ -86,6 +87,7 @@ FALCO_PLUGIN_SDK_PUBLIC int32_t plugin_extract_fields(ss_plugin_t *s,
 	s_async_ctx_batch[(size_t)s - 1].evt = evt;
 	s_async_ctx_batch[(size_t)s - 1].num_fields = in->num_fields;
 	s_async_ctx_batch[(size_t)s - 1].fields = in->fields;
+	s_async_ctx_batch[(size_t)s - 1].value_offsets = in->value_offsets;
 
 	// notify data request
 	atomic_store_explicit(&s_async_ctx_batch[(size_t)s - 1].lock, DATA_REQ, memory_order_seq_cst);
