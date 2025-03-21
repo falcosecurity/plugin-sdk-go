@@ -96,6 +96,16 @@ func getBinResSSPluingExtractField(t *testing.T, p *_Ctype_ss_plugin_extract_fie
 	return buf
 }
 
+func getMetadataSliceResSSPluginExtractField(t *testing.T, ptr *_Ctype_ss_plugin_extract_field, index int) [2]uint32 {
+	if ptr.res_len < (_Ctype_uint64_t)(index) {
+		t.Errorf("trying to access extract field res at index %d, but res len is %d", index, (int)(ptr.res_len))
+	}
+	var slice [2]uint32
+	slice[0] = (uint32)(*((*_Ctype_uint32_t)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&ptr.res))) + uintptr(index*_Ciconst_sizeof_uint32_t*2)))))
+	slice[1] = (uint32)(*((*_Ctype_uint32_t)(unsafe.Pointer(uintptr(*(*_Ctype_uintptr_t)(unsafe.Pointer(&ptr.res))) + uintptr(index*_Ciconst_sizeof_uint32_t*2 + _Ciconst_sizeof_uint32_t)))))
+	return slice
+}
+
 func assertPanic(t *testing.T, fun func()) {
 	defer func() {
 		if r := recover(); r == nil {
@@ -128,6 +138,7 @@ func TestExtractRequestSetValue(t *testing.T) {
 	testU64 := uint64(99)
 	testBool := true
 	testIPv6 := net.IPv6loopback
+	testMetadataSlice := [2]uint32 {5, 10}
 	testStrList := make([]string, 0)
 	testU64List := make([]uint64, 0)
 	testBoolList := make([]bool, 0)
@@ -153,6 +164,7 @@ func TestExtractRequestSetValue(t *testing.T) {
 	boolListPtr, freeBoolListPtr := allocSSPluginExtractField(6, FieldTypeBool, "test.bool", "", 0, true, true)
 	binPtr, freeBinPtr := allocSSPluginExtractField(7, FieldTypeIPAddr, "test.ipv6addr", "", 0, true, false)
 	binListPtr, freeBinListPtr := allocSSPluginExtractField(8, FieldTypeIPAddr, "test.ipv6addr", "", 0, true, true)
+	metadataSlicePtr, freeMetadataSlicePtr := allocSSPluginExtractField(9, FieldMetaTypeSlice, "test.metadata_slice", "", 0, false, false)
 	u64Req := pool.Get(0)
 	u64ReqList := pool.Get(1)
 	strReq := pool.Get(2)
@@ -161,6 +173,7 @@ func TestExtractRequestSetValue(t *testing.T) {
 	boolReqList := pool.Get(5)
 	binReq := pool.Get(6)
 	binReqList := pool.Get(7)
+	metadataSliceReq := pool.Get(8)
 	u64Req.SetPtr(unsafe.Pointer(u64Ptr))
 	u64ReqList.SetPtr(unsafe.Pointer(u64ListPtr))
 	strReq.SetPtr(unsafe.Pointer(strPtr))
@@ -169,6 +182,7 @@ func TestExtractRequestSetValue(t *testing.T) {
 	boolReqList.SetPtr(unsafe.Pointer(boolListPtr))
 	binReq.SetPtr(unsafe.Pointer(binPtr))
 	binReqList.SetPtr(unsafe.Pointer(binListPtr))
+	metadataSliceReq.SetPtr(unsafe.Pointer(metadataSlicePtr))
 
 	// check that info is passed-through correctly
 	if u64Req.FieldID() != 1 {
@@ -272,7 +286,10 @@ func TestExtractRequestSetValue(t *testing.T) {
 				}
 			}
 		}
-
+	}
+	metadataSliceReq.SetValue(testMetadataSlice)
+	if getMetadataSliceResSSPluginExtractField(t, metadataSlicePtr, 0) != testMetadataSlice {
+		t.Errorf("expected value '%v', but found '%v'", testMetadataSlice, getMetadataSliceResSSPluginExtractField(t, metadataSlicePtr, 0))
 	}
 
 	pool.Free()
@@ -284,4 +301,5 @@ func TestExtractRequestSetValue(t *testing.T) {
 	freeBoolListPtr()
 	freeBinPtr()
 	freeBinListPtr()
+	freeMetadataSlicePtr()
 }

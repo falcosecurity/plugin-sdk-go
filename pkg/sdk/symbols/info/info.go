@@ -27,6 +27,7 @@ limitations under the License.
 //	char* get_required_api_version();
 //	char* get_event_source();
 //	char* get_extract_event_sources();
+//	uint32_t get_extract_metadata_capability();
 //
 // In almost all cases, your plugin should import this module, unless
 // your plugin exports those symbols by other means.
@@ -44,15 +45,16 @@ import (
 )
 
 var (
-	pType                uint32
-	pId                  uint32
-	pName                ptr.StringBuffer
-	pDescription         ptr.StringBuffer
-	pContact             ptr.StringBuffer
-	pVersion             ptr.StringBuffer
-	pRequiredAPIVersion  ptr.StringBuffer
-	pEventSource         ptr.StringBuffer
-	pExtractEventSources ptr.StringBuffer
+	pType                      uint32
+	pId                        uint32
+	pName                      ptr.StringBuffer
+	pDescription               ptr.StringBuffer
+	pContact                   ptr.StringBuffer
+	pVersion                   ptr.StringBuffer
+	pRequiredAPIVersion        ptr.StringBuffer
+	pEventSource               ptr.StringBuffer
+	pExtractEventSources       ptr.StringBuffer
+	pExtractMetadataCapability bool
 )
 
 //export plugin_get_id
@@ -163,4 +165,16 @@ func SetExtractEventSources(sources []string) {
 	} else {
 		pExtractEventSources.Write(string(b))
 	}
+}
+
+//export plugin_get_extract_metadata_capability
+func plugin_get_extract_metadata_capability() uint32 {
+	if pExtractMetadataCapability {
+		return 1
+	}
+	return 0
+}
+
+func SetExtractMetadataCapability(capable bool) {
+	pExtractMetadataCapability = capable
 }

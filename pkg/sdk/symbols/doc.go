@@ -40,17 +40,18 @@ limitations under the License.
 // The mapping between the prebuilt C exported symbols and their sub-package
 // has been designed by grouping them depending on their use cases.
 // The mapping is designed as follows:
-//  - info:         get_type, get_id, get_description, get_contact,
-//                  get_version, get_required_api_version,
-//                  get_event_source, get_extract_event_sources
-//  - fields:       plugin_get_fields
-//  - lasterr:      plugin_get_last_error
-//  - initialize:   plugin_init, plugin_destroy
-//  - open:         plugin_open, plugin_close
-//  - nextbatch:    plugin_next_batch
-//  - extract:      plugin_extract_fields
-//  - evtstr:       plugin_event_to_string
-//  - progress:     plugin_get_progress
+//   - info:         get_type, get_id, get_description, get_contact,
+//     get_version, get_required_api_version,
+//     get_event_source, get_extract_event_sources,
+//     get_extract_metadata_capability
+//   - fields:       plugin_get_fields
+//   - lasterr:      plugin_get_last_error
+//   - initialize:   plugin_init, plugin_destroy
+//   - open:         plugin_open, plugin_close
+//   - nextbatch:    plugin_next_batch
+//   - extract:      plugin_extract_fields
+//   - evtstr:       plugin_event_to_string
+//   - progress:     plugin_get_progress
 //
 // There are no horizontal dependencies between the sub-packages, which means
 // that they are independent from one another. Each sub-package only depends
@@ -58,5 +59,4 @@ limitations under the License.
 // constructs from the ptr and cgo packages. This makes each sub-package
 // composable, and developers can easily mix manually implemented C symbols
 // with the prebuilt ones, as long as the interface requirements are respected.
-//
 package symbols
