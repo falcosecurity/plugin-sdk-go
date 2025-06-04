@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /*
-Copyright (C) 2023 The Falco Authors.
+Copyright (C) 2025 The Falco Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,9 +34,14 @@ import (
 // todo(jasondellaluce): pull this information from falcosecurity/libs in the future
 const pluginEventCode = 322
 
+// todo(leogr): replace this with PLUGIN_EVENT_PAYLOAD_OFFSET from "plugin_api.h"
+
 // PluginEventHeaderSize is the size of a scap event header, plus the
 // params lenght and the plugin ID integers of a PPME_PLUGINEVENT_E event.
 // In other words, this is the size of a plugin event with an empty data payload.
+//
+// 26 bytes for the event header, plus 2*4 bytes for the parameter lengths,
+// plus 4 bytes for the plugin ID.
 const PluginEventHeaderSize = C.sizeof_ss_plugin_event + 4 + 4 + 4
 
 // EventWriter can be used to represent events produced by a plugin.

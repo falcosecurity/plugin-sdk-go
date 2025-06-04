@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /*
-Copyright (C) 2023 The Falco Authors.
+Copyright (C) 2025 The Falco Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ limitations under the License.
 package extract
 
 /*
+#include <stdlib.h>
 #include "extract.h"
 */
 import "C"
@@ -48,13 +49,26 @@ func plugin_extract_fields_sync(plgState C.uintptr_t, evt *C.ss_plugin_event_inp
 	flds := (*[1 << 28]C.struct_ss_plugin_extract_field)(unsafe.Pointer(fields))[:numFields:numFields]
 	var i uint32
 	var extrReq sdk.ExtractRequest
+
+	if offsets != nil {
+		offsets.start = (*C.uint32_t)(C.calloc((C.size_t)(numFields), (C.size_t)(C.sizeof_uint32_t)))
+		offsets.length = (*C.uint32_t)(C.calloc((C.size_t)(numFields), (C.size_t)(C.sizeof_uint32_t)))
+		defer C.free(unsafe.Pointer(offsets.start))
+		defer C.free(unsafe.Pointer(offsets.length))
+	}
+
 	for i = 0; i < numFields; i++ {
 		flds[i].res_len = (C.uint64_t)(0)
 		extrReq = extrReqs.ExtractRequests().Get(int(flds[i].field_id))
 		extrReq.SetPtr(unsafe.Pointer(&flds[i]))
-		if offsets != nil {
-			offs := (*[1 << 28]C.struct_ss_plugin_extract_value_offsets)(unsafe.Pointer(offsets))[:numFields:numFields]
-			extrReq.SetOffsetPtr(unsafe.Pointer(&offs[i]))
+
+		if offsets == nil {
+			extrReq.SetOffsetPtrs(nil, nil)
+		} else {
+			extrReq.SetOffsetPtrs(
+				unsafe.Add(unsafe.Pointer(offsets.start), i*C.sizeof_uint32_t),
+				unsafe.Add(unsafe.Pointer(offsets.length), i*C.sizeof_uint32_t),
+			)
 		}
 
 		err := extract.Extract(extrReq, sdk.NewEventReader(unsafe.Pointer(evt)))

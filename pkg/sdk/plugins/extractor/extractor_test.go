@@ -55,8 +55,8 @@ func (m *testPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error 
 	switch req.FieldID() {
 	case 0:
 		req.SetValue(uint64(0))
-		if req.WantOffsets() {
-			req.SetValueOffsets(sdk.ValueOffset{Start: sdk.PluginEventHeaderSize, Length: 8})
+		if req.WantOffset() {
+			req.SetValueOffset(sdk.PluginEventHeaderSize, 8)
 		}
 		return nil
 	default:
