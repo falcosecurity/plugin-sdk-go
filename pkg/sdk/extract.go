@@ -106,11 +106,11 @@ type ExtractRequest interface {
 	//  - sdk.FieldTypeIPNet: net.IPNet, *net.IPNet
 	SetValue(v interface{})
 	//
-	// TODO SetValueOffsets sets the start offset and length of one or more
-	// fields. The start offset for each field must be from the
+	// TODO SetValueOffsets sets the start offset and length of one or
+	// more fields. The start offset for each field must be from the
 	// beginning of the event to the start of the field data.
-	// sdk.PluginEventHeaderSize should be used to get the event header
-	// size. {0,0} can be used to indicate that the field doesn't
+	// sdk.PluginEventPayloadOffset should be used to get the event
+	// header size. {0,0} can be used to indicate that the field doesn't
 	// correspond to any bytes in the event or log data.
 	SetValueOffset(start, length uint32)
 	//

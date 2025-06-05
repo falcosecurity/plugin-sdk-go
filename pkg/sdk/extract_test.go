@@ -135,13 +135,13 @@ func TestExtractRequestSetValue(t *testing.T) {
 	// init test data
 	testStr := "test str"
 	testU64 := uint64(99)
-	testU64Start := uint32(PluginEventHeaderSize)
+	testU64Start := uint32(PluginEventPayloadOffset)
 	testU64Length := uint32(8)
 	testBool := true
 	testIPv6 := net.IPv6loopback
 	testStrList := make([]string, 0)
 	testU64List := make([]uint64, 0)
-	testU64ListStart := uint32(PluginEventHeaderSize)
+	testU64ListStart := uint32(PluginEventPayloadOffset)
 	testU64ListLength := uint32(0)
 	testBoolList := make([]bool, 0)
 	dataArray := make([]byte, (minResultBufferLen+1)*int(len(testIPv6)))

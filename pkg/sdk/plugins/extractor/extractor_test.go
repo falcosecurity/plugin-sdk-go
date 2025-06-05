@@ -56,7 +56,7 @@ func (m *testPlugin) Extract(req sdk.ExtractRequest, evt sdk.EventReader) error 
 	case 0:
 		req.SetValue(uint64(0))
 		if req.WantOffset() {
-			req.SetValueOffset(sdk.PluginEventHeaderSize, 8)
+			req.SetValueOffset(sdk.PluginEventPayloadOffset, 8)
 		}
 		return nil
 	default:

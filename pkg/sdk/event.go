@@ -36,13 +36,13 @@ const pluginEventCode = 322
 
 // todo(leogr): replace this with PLUGIN_EVENT_PAYLOAD_OFFSET from "plugin_api.h"
 
-// PluginEventHeaderSize is the size of a scap event header, plus the
+// PluginEventPayloadOffset is the size of a scap event header, plus the
 // params lenght and the plugin ID integers of a PPME_PLUGINEVENT_E event.
 // In other words, this is the size of a plugin event with an empty data payload.
 //
 // 26 bytes for the event header, plus 2*4 bytes for the parameter lengths,
 // plus 4 bytes for the plugin ID.
-const PluginEventHeaderSize = C.sizeof_ss_plugin_event + 4 + 4 + 4
+const PluginEventPayloadOffset = C.sizeof_ss_plugin_event + 4 + 4 + 4
 
 // EventWriter can be used to represent events produced by a plugin.
 // This interface is meant to be used in the next/next_batch.
@@ -185,11 +185,11 @@ type eventWriter struct {
 }
 
 func newEventWriter(dataSize int64) (*eventWriter, error) {
-	evt := (*C.ss_plugin_event)(C.calloc(1, C.size_t(dataSize+PluginEventHeaderSize)))
+	evt := (*C.ss_plugin_event)(C.calloc(1, C.size_t(dataSize+PluginEventPayloadOffset)))
 	evt._type = pluginEventCode
 	evt.ts = C.uint64_t(C.UINT64_MAX)
 	evt.tid = C.uint64_t(C.UINT64_MAX)
-	evt.len = (C.uint32_t)(PluginEventHeaderSize)
+	evt.len = (C.uint32_t)(PluginEventPayloadOffset)
 	// note(jasondellaluce): CGO fails to properly encode nparams for *reasons*,
 	// so we're forced to write their value manually with an offset
 	*(*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(evt)) + 22)) = 2
@@ -200,7 +200,7 @@ func newEventWriter(dataSize int64) (*eventWriter, error) {
 	// plugin ID value (note: putting zero makes the framework set it automatically)
 	*(*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(evt)) + C.sizeof_ss_plugin_event + 8)) = 0
 	// create a read/writer for the data payload
-	brw, err := ptr.NewBytesReadWriter(unsafe.Pointer(uintptr(unsafe.Pointer(evt))+PluginEventHeaderSize), int64(dataSize), int64(dataSize))
+	brw, err := ptr.NewBytesReadWriter(unsafe.Pointer(uintptr(unsafe.Pointer(evt))+PluginEventPayloadOffset), int64(dataSize), int64(dataSize))
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +219,7 @@ func (p *eventWriter) dataLenPtr() *C.uint32_t {
 func (p *eventWriter) Writer() io.Writer {
 	p.data.SetLen(p.dataSize)
 	p.data.Seek(0, io.SeekStart)
-	p.ssPluginEvt.len = (C.uint32_t)(PluginEventHeaderSize)
+	p.ssPluginEvt.len = (C.uint32_t)(PluginEventPayloadOffset)
 	*p.dataLenPtr() = 0
 	return p
 }
@@ -257,7 +257,7 @@ func (e *eventReader) Reader() io.ReadSeeker {
 		panic(fmt.Sprintf("plugin-sdk-go/sdk: reveived extraction request for non-plugin event (code=%d)", e.evt._type))
 	}
 	datalen := *(*C.uint32_t)(unsafe.Pointer(uintptr(unsafe.Pointer(e.evt)) + C.sizeof_ss_plugin_event + 4))
-	brw, _ := ptr.NewBytesReadWriter(unsafe.Pointer(uintptr(unsafe.Pointer(e.evt))+PluginEventHeaderSize), int64(datalen), int64(datalen))
+	brw, _ := ptr.NewBytesReadWriter(unsafe.Pointer(uintptr(unsafe.Pointer(e.evt))+PluginEventPayloadOffset), int64(datalen), int64(datalen))
 	return brw
 }
 
