@@ -118,9 +118,9 @@ type ExtractRequest interface {
 	// be wrapped in this instance of ExtractRequest.
 	SetPtr(unsafe.Pointer)
 	//
-	// SetOffsetPtr sets a pointer to a ss_plugin_extract_value_offsets
-	// C structure to be wrapped in this instance of ExtractRequest.
-	SetOffsetPtrs(start, length unsafe.Pointer)
+	// SetOffsetPtrs sets the pointers to the memory locations that will
+	// hold the values set by SetValueOffset.
+	SetOffsetPtrs(startPtr, lengthPtr unsafe.Pointer)
 	//
 	// WantOffset returns true if the caller is requesting the offset
 	// for the current field.
@@ -136,6 +136,11 @@ type ExtractRequestPool interface {
 	// position inside the pool. Indexes can be non-contiguous.
 	Get(requestIndex int) ExtractRequest
 	//
+	// SetOffsetArrayPtrs sets the pointers to the start offset and
+	// length arrays that will be returned to the caller via the
+	// ss_plugin_extract_value_offsets C structure.
+	SetOffsetArrayPtrs(startArrayPtr, lengthArrayPtr unsafe.Pointer)
+	//
 	// Free deallocates any memory used by the pool that can't be disposed
 	// through garbage collection. The behavior of Free after the first call
 	// is undefined.
@@ -144,6 +149,7 @@ type ExtractRequestPool interface {
 
 type extractRequestPool struct {
 	reqs map[uint]*extractRequest
+	startArrayPtr, lengthArrayPtr unsafe.Pointer
 }
 
 func (e *extractRequestPool) Get(requestIndex int) ExtractRequest {
@@ -164,6 +170,11 @@ func (e *extractRequestPool) Get(requestIndex int) ExtractRequest {
 	return r
 }
 
+func (e *extractRequestPool) SetOffsetArrayPtrs(startArrayPtr, lengthArrayPtr unsafe.Pointer) {
+	e.startArrayPtr = startArrayPtr
+	e.lengthArrayPtr = lengthArrayPtr
+}
+
 func (e *extractRequestPool) Free() {
 	for _, v := range e.reqs {
 		for _, b := range v.resStrBufs {
@@ -171,6 +182,8 @@ func (e *extractRequestPool) Free() {
 		}
 		C.free(unsafe.Pointer(v.resBuf))
 	}
+	C.free(e.startArrayPtr)
+	C.free(e.lengthArrayPtr)
 }
 
 // NewExtractRequestPool returns a new empty ExtractRequestPool.
@@ -203,9 +216,9 @@ func (e *extractRequest) SetPtr(pef unsafe.Pointer) {
 	e.req = (*C.ss_plugin_extract_field)(pef)
 }
 
-func (e *extractRequest) SetOffsetPtrs(start, length unsafe.Pointer) {
-	e.resOffsetStart = (*C.uint32_t)(start)
-	e.resOffsetLength = (*C.uint32_t)(length)
+func (e *extractRequest) SetOffsetPtrs(startPtr, lengthPtr unsafe.Pointer) {
+	e.resOffsetStart = (*C.uint32_t)(startPtr)
+	e.resOffsetLength = (*C.uint32_t)(lengthPtr)
 }
 
 func (e *extractRequest) FieldID() uint64 {
