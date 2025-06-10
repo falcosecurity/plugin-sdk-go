@@ -51,9 +51,7 @@ func plugin_extract_fields_sync(plgState C.uintptr_t, evt *C.ss_plugin_event_inp
 	var extrReq sdk.ExtractRequest
 
 	if offsets != nil {
-		offsets.start = (*C.uint32_t)(C.calloc((C.size_t)(numFields), (C.size_t)(C.sizeof_uint32_t)))
-		offsets.length = (*C.uint32_t)(C.calloc((C.size_t)(numFields), (C.size_t)(C.sizeof_uint32_t)))
-		extrReqs.ExtractRequests().SetOffsetArrayPtrs(unsafe.Pointer(offsets.start), unsafe.Pointer(offsets.length))
+		extrReqs.ExtractRequests().MakeOffsetArrayPtrs(unsafe.Pointer(offsets), numFields)
 	}
 
 	for i = 0; i < numFields; i++ {
