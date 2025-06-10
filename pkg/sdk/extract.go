@@ -136,10 +136,17 @@ type ExtractRequestPool interface {
 	// position inside the pool. Indexes can be non-contiguous.
 	Get(requestIndex int) ExtractRequest
 	//
-	// SetOffsetArrayPtrs sets the pointers to the start offset and
-	// length arrays that will be returned to the caller via the
-	// ss_plugin_extract_value_offsets C structure.
-	SetOffsetArrayPtrs(startArrayPtr, lengthArrayPtr unsafe.Pointer)
+	// MakeOffsetArrayPtrs allocates and initializes the start offset and length arrays,
+	// then assigns their pointers to the provided ss_plugin_extract_value_offsets structure.
+	// These arrays track field boundaries for extracted values.
+	//
+	// This function must be called before using any ExtractRequest returned by Get,
+	// as the arrays are uninitialized until this point.
+	//
+	// Parameters:
+	//   - extractValueOffsets: pointer to ss_plugin_extract_value_offsets structure to populate
+	//   - cap: required capacity for the offset arrays
+	MakeOffsetArrayPtrs(extractValueOffsets unsafe.Pointer, cap uint32)
 	//
 	// Free deallocates any memory used by the pool that can't be disposed
 	// through garbage collection. The behavior of Free after the first call
@@ -148,8 +155,9 @@ type ExtractRequestPool interface {
 }
 
 type extractRequestPool struct {
-	reqs map[uint]*extractRequest
+	reqs                          map[uint]*extractRequest
 	startArrayPtr, lengthArrayPtr unsafe.Pointer
+	arrayPtrCap                   uint32
 }
 
 func (e *extractRequestPool) Get(requestIndex int) ExtractRequest {
@@ -170,9 +178,29 @@ func (e *extractRequestPool) Get(requestIndex int) ExtractRequest {
 	return r
 }
 
-func (e *extractRequestPool) SetOffsetArrayPtrs(startArrayPtr, lengthArrayPtr unsafe.Pointer) {
-	e.startArrayPtr = startArrayPtr
-	e.lengthArrayPtr = lengthArrayPtr
+func (e *extractRequestPool) MakeOffsetArrayPtrs(extractValueOffsets unsafe.Pointer, cap uint32) {
+	// If we need more capacity, free old arrays and allocate new ones
+	if cap > e.arrayPtrCap {
+		// Free existing arrays if they exist
+		if e.arrayPtrCap > 0 {
+			C.free(e.startArrayPtr)
+			C.free(e.lengthArrayPtr)
+		}
+
+		// Allocate new arrays with required capacity - calloc zeros the memory
+		e.startArrayPtr = unsafe.Pointer(C.calloc(C.size_t(cap), C.sizeof_uint32_t))
+		e.lengthArrayPtr = unsafe.Pointer(C.calloc(C.size_t(cap), C.sizeof_uint32_t))
+
+		e.arrayPtrCap = cap
+	} else {
+		// Capacity is sufficient, just zero the arrays for fresh extraction request
+		size := C.size_t(cap) * C.sizeof_uint32_t
+		C.memset(e.startArrayPtr, 0, size)
+		C.memset(e.lengthArrayPtr, 0, size)
+	}
+
+	(*C.ss_plugin_extract_value_offsets)(extractValueOffsets).start = (*C.uint32_t)(e.startArrayPtr)
+	(*C.ss_plugin_extract_value_offsets)(extractValueOffsets).length = (*C.uint32_t)(e.lengthArrayPtr)
 }
 
 func (e *extractRequestPool) Free() {
@@ -182,8 +210,10 @@ func (e *extractRequestPool) Free() {
 		}
 		C.free(unsafe.Pointer(v.resBuf))
 	}
-	C.free(e.startArrayPtr)
-	C.free(e.lengthArrayPtr)
+	if e.arrayPtrCap > 0 {
+		C.free(e.startArrayPtr)
+		C.free(e.lengthArrayPtr)
+	}
 }
 
 // NewExtractRequestPool returns a new empty ExtractRequestPool.
