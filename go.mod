@@ -3,7 +3,7 @@ module github.com/falcosecurity/plugin-sdk-go
 go 1.17
 
 require (
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.11.1
 	github.com/xeipuuv/gojsonschema v1.2.0
 )
 
