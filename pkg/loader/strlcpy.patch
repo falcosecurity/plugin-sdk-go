@@ -80,7 +80,7 @@ index 2943335..7bebeeb 100644
  		}
  	}
  #else
- 	ret->handle = dlopen(path, RTLD_LAZY);
+	ret->handle = dlopen(path, RTLD_LAZY|RTLD_DEEPBIND);
  	if(ret->handle == NULL) {
 -		strlcpy(err, (const char*)dlerror(), PLUGIN_MAX_ERRLEN);
 +		plugin_loader_strlcpy(err, (const char*)dlerror(), PLUGIN_MAX_ERRLEN);
