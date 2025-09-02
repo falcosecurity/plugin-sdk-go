@@ -70,7 +70,7 @@ index 2943335..7bebeeb 100644
  		return NULL;
  	}
  
-@@ -77,14 +107,14 @@ plugin_handle_t* plugin_load(const char* path, char* err) {
+@@ -77,14 +107,19 @@ plugin_handle_t* plugin_load(const char* path, char* err) {
  		            FORMAT_MESSAGE_IGNORE_INSERTS;
  		LPTSTR msg_buf = 0;
  		if(FormatMessageA(flg, 0, GetLastError(), 0, (LPTSTR)&msg_buf, 0, NULL) && msg_buf) {
@@ -80,14 +80,20 @@ index 2943335..7bebeeb 100644
  		}
  	}
  #else
-	ret->handle = dlopen(path, RTLD_LAZY|RTLD_DEEPBIND);
+-	ret->handle = dlopen(path, RTLD_LAZY);
++#ifdef __linux__
++	int dlopen_flags = RTLD_NOW|RTLD_DEEPBIND;
++#else
++	int dlopen_flags = RTLD_NOW;
++#endif
++	ret->handle = dlopen(path, dlopen_flags);
  	if(ret->handle == NULL) {
 -		strlcpy(err, (const char*)dlerror(), PLUGIN_MAX_ERRLEN);
 +		plugin_loader_strlcpy(err, (const char*)dlerror(), PLUGIN_MAX_ERRLEN);
  	}
  #endif
  
-@@ -135,13 +165,13 @@ plugin_handle_t* plugin_load_api(const plugin_api* api, char* err) {
+@@ -135,13 +170,13 @@ plugin_handle_t* plugin_load_api(const plugin_api* api, char* err) {
  	// alloc and init memory
  	err[0] = '\0';
  	if(!api) {
@@ -103,7 +109,7 @@ index 2943335..7bebeeb 100644
  		return NULL;
  	}
  	ret->api = *api;
-@@ -150,7 +180,7 @@ plugin_handle_t* plugin_load_api(const plugin_api* api, char* err) {
+@@ -150,7 +185,7 @@ plugin_handle_t* plugin_load_api(const plugin_api* api, char* err) {
  	uint32_t major, minor, patch;
  	const char* ver;
  	if(api->get_required_api_version == NULL) {
@@ -112,7 +118,7 @@ index 2943335..7bebeeb 100644
  		return NULL;
  	}
  
-@@ -217,7 +247,7 @@ bool plugin_check_required_api_version(const plugin_handle_t* h, char* err) {
+@@ -217,7 +252,7 @@ bool plugin_check_required_api_version(const plugin_handle_t* h, char* err) {
  	uint32_t major, minor, patch;
  	const char *ver, *failmsg;
  	if(h->api.get_required_api_version == NULL) {
@@ -121,7 +127,7 @@ index 2943335..7bebeeb 100644
  		return false;
  	}
  
-@@ -256,7 +286,7 @@ bool plugin_check_required_api_version(const plugin_handle_t* h, char* err) {
+@@ -256,7 +291,7 @@ bool plugin_check_required_api_version(const plugin_handle_t* h, char* err) {
  
  plugin_caps_t plugin_get_capabilities(const plugin_handle_t* h, char* err) {
  	plugin_caps_t caps = CAP_NONE;
