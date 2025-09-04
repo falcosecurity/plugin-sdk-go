@@ -1,0 +1,62 @@
+diff --git a/pkg/loader/plugin_loader.c b/pkg/loader/plugin_loader.c
+index 3aea70c..a68327a 100644
+--- a/pkg/loader/plugin_loader.c
++++ b/pkg/loader/plugin_loader.c
+@@ -33,6 +33,7 @@ typedef void* library_handle_t;
+ // note(jasondellaluce,therealbobo): implementation taken from falcosecurity/libs
+ // note(leogr): to avoid clashing with `strlcpy` introduced by glibc 2.38, 
+ //              the func has been renamed to plugin_loader_strlcpy.
++//              The same applies to `strlcat`.
+ //              N.B.: our building system here is not smart enough to detect if the function
+ //                    was declared already.
+ #include <stdint.h>
+@@ -61,6 +62,37 @@ static inline size_t plugin_loader_strlcpy(char *dst, const char *src, size_t si
+     return srcsize;
+ }
+ 
++/*!
++  \brief Append the NUL-terminated string src to the end of dst. It will append at most size −
++  strlen(dst) − 1 bytes, NUL-terminating the result.
++
++  \return The initial length of dst plus the length of src
++*/
++
++static inline size_t plugin_loader_strlcat(char *dst, const char *src, size_t size) {
++	size_t srcsize = strlen(src);
++	size_t dstsize = strlen(dst);
++
++	if(dstsize >= size) {
++		return size;
++	}
++
++	if(srcsize == 0) {
++		return dstsize;
++	}
++
++	size_t totalsize = srcsize + dstsize;
++	if(totalsize > size - 1) {
++		totalsize = size - 1;
++	}
++
++	size_t copysize = totalsize - dstsize;
++	memcpy(dst + dstsize, src, copysize);
++	dst[totalsize] = '\0';
++
++	return dstsize + srcsize;
++}
++
+ static inline void err_prepend(char* s, const char* prefix, const char* sep) {
+ 	char tmp[PLUGIN_MAX_ERRLEN];
+ 	size_t prefix_len = plugin_loader_strlcpy(tmp, prefix, PLUGIN_MAX_ERRLEN);
+@@ -74,9 +106,9 @@ static inline void err_prepend(char* s, const char* prefix, const char* sep) {
+ 
+ static inline void err_append(char* s, const char* suffix, const char* sep) {
+ 	if(*s != '\0') {
+-		strlcat(s, sep, PLUGIN_MAX_ERRLEN);
++		plugin_loader_strlcat(s, sep, PLUGIN_MAX_ERRLEN);
+ 	}
+-	strlcat(s, suffix, PLUGIN_MAX_ERRLEN);
++	plugin_loader_strlcat(s, suffix, PLUGIN_MAX_ERRLEN);
+ }
+ 
+ static void* getsym(library_handle_t handle, const char* name) {

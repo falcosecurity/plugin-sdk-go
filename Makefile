@@ -38,6 +38,7 @@ pluginlib:
 	$(CURL) -Lso pkg/loader/plugin_loader.c $(PLUGINLIB_URL)/plugin_loader.c
 	$(PATCH) -p1 < pkg/loader/plugin_api_include.patch
 	$(PATCH) -p1 < pkg/loader/strlcpy.patch
+	$(PATCH) -p1 < pkg/loader/strlcat.patch
 	$(PATCH) -p1 < pkg/sdk/plugin_types_include.patch
 
 clean-pluginlib:
