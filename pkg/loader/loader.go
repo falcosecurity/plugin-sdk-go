@@ -182,7 +182,11 @@ func NewPlugin(path string) (*Plugin, error) {
 	errBuf := (*C.char)(C.malloc(C.size_t(C.__plugin_max_errlen) * C.sizeof_char))
 	defer C.free(unsafe.Pointer(errBuf))
 	p := &Plugin{}
-	p.handle = C.plugin_load(C.CString(path), errBuf)
+	// plugin_load hands the path straight to dlopen/LoadLibrary and does not
+	// retain it, so the copy is ours to release.
+	cPath := C.CString(path)
+	defer C.free(unsafe.Pointer(cPath))
+	p.handle = C.plugin_load(cPath, errBuf)
 	if p.handle == nil {
 		return nil, errors.New(C.GoString(errBuf))
 	}
@@ -389,7 +393,11 @@ func (p *Plugin) Init(config string) error {
 	in.owner = nil
 	in.get_owner_last_error = nil
 	in.tables = nil
-	in.config = C.CString(config)
+	// Unlike owner, which the header documents as safe for a plugin to store,
+	// config is only an input to this call, so the copy does not outlive it.
+	cConfig := C.CString(config)
+	defer C.free(unsafe.Pointer(cConfig))
+	in.config = cConfig
 	rc := C.ss_plugin_rc(sdk.SSPluginSuccess)
 	p.state = (*C.ss_plugin_t)(C.__init(&p.handle.api, &in, (*C.ss_plugin_rc)(&rc)))
 	if rc == C.ss_plugin_rc(sdk.SSPluginSuccess) {
