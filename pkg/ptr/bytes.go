@@ -165,10 +165,10 @@ func (b *bytesReadWriter) Seek(offset int64, whence int) (int64, error) {
 	}
 	switch whence {
 	case io.SeekStart:
-		b.offset = offset
 		if offset > b.len {
 			return b.offset, fmt.Errorf(offsetErrorFmt, offset)
 		}
+		b.offset = offset
 	case io.SeekCurrent:
 		if offset > b.len-b.offset {
 			return b.offset, fmt.Errorf(offsetErrorFmt, offset)
